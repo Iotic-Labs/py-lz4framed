@@ -1,0 +1,5 @@
+*.py[cod]
+*.so
+build/
+dist/
+__pycache__/
