@@ -1,9 +1,5 @@
 /* Copyright (c) 2015 Iotic Labs Ltd. All rights reserved. */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-
 // byte/string argument parsing size as Py_ssize_t (e.g. via PyArg_ParseTupleAndKeywords)
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
@@ -65,7 +61,7 @@ typedef struct {
     LZ4F_preferences_t prefs;
 } _lz4f_cctx_t;
 
-static LZ4F_preferences_t prefs_defaults = {{0}, 0, 0, {0}};
+static LZ4F_preferences_t prefs_defaults = {{0, 0, 0, 0, 0, {0}}, 0, 0, {0}};
 
 /******************************************************************************/
 
