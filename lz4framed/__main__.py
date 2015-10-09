@@ -6,7 +6,7 @@ from __future__ import print_function
 from sys import argv, stderr
 
 from .compat import stdin_raw, stdout_raw
-from . import Compressor, Decompressor, Lz4FramedError, get_block_size, LZ4F_BLOCKSIZE_DEFAULT
+from . import Compressor, Decompressor, Lz4FramedError, Lz4FramedNoDataError, get_block_size
 
 
 def __error(*args, **kwargs):
@@ -15,16 +15,16 @@ def __error(*args, **kwargs):
 
 def do_compress(inStream, outStream):
     read = inStream.read
-    readSize = get_block_size(LZ4F_BLOCKSIZE_DEFAULT)
+    readSize = get_block_size()
     try:
         with Compressor(fp=outStream) as c:
             try:
-                c.update(read(readSize))
                 while True:
                     c.update(read(readSize))
-            # empty bytes object -> EOF
-            except ValueError:
+            # empty read result supplied to update()
+            except Lz4FramedNoDataError:
                 pass
+            # input stream exception
             except EOFError:
                 pass
     except Lz4FramedError as e:

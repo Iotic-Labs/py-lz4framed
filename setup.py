@@ -2,7 +2,7 @@
 
 from distutils.core import setup, Extension
 
-VERSION = '0.5'
+VERSION = '0.6'
 # see lz4/NEWS
 LZ4_VERSION = 'r131'
 
@@ -31,7 +31,7 @@ setup(
             '-DXXH_NAMESPACE=PLZ4F_',
             '-DVERSION="%s"' % VERSION,
             '-DLZ4_VERSION="%s"' % LZ4_VERSION,
-            # TODO - check which appear in cl, make rest appear only for gcc
+            # TODO - some of these are GCC-specific
             '-O3',
             '-Wall',
             '-Wextra',

@@ -51,8 +51,21 @@ if (result) {\
 #define DECOMPRESSION_CAPSULE_NAME "_lz4fdctx"
 
 PyDoc_STRVAR(__lz4f_error__doc__,
-"Raised when an lz4-specific error occurs. Arguments are the error message and associated code.");
-static PyObject *LZ4FError;
+             "Raised when an lz4-specific error occurs. Arguments are the error message and associated code.");
+static PyObject *LZ4FError = NULL;
+PyDoc_STRVAR(__lz4f_no_data_error__doc__,
+             "Raised by compress_update() and compress() when data supplied is of zero length");
+static PyObject *LZ4FNoDataError = NULL;
+
+/* Hold compression context together with preferences, so compress_update & compress_end can calculate right output size
+ * based on actualy preferences previously set via compress_begin (rather than defaults).
+ */
+typedef struct {
+    LZ4F_compressionContext_t ctx;
+    LZ4F_preferences_t prefs;
+} _lz4f_cctx_t;
+
+static LZ4F_preferences_t prefs_defaults = {{0}, 0, 0, {0}};
 
 /******************************************************************************/
 
@@ -84,12 +97,11 @@ static size_t _lz4f_block_size_from_id(int id) {
 
 // TODO - test on 32-bit linux (pi) 2.7 & 3.x
 // TODO - test on windows? http://blog.ionelmc.ro/2014/12/21/compiling-python-extensions-on-windows/
-// TODO - flush method?
 
 /******************************************************************************/
 
 PyDoc_STRVAR(_lz4framed_get_block_size__doc__,
-"get_block_size(id) -> int\n"
+"get_block_size(id=LZ4F_BLOCKSIZE_DEFAULT) -> int\n"
 "\n"
 "Returns block size in bytes for the given lz4 block size id\n"
 "\n"
@@ -99,11 +111,11 @@ PyDoc_STRVAR(_lz4framed_get_block_size__doc__,
                                  _lz4framed_get_block_size__doc__}
 static PyObject*
 _lz4framed_get_block_size(PyObject *self, PyObject *args) {
-    int block_id;
+    int block_id = LZ4F_default;
     PyObject *byte_count = NULL;
     UNUSED(self);
 
-    if (!PyArg_ParseTuple(args, "i:get_block_size", &block_id)) {
+    if (!PyArg_ParseTuple(args, "|i:get_block_size", &block_id)) {
         goto bail;
     }
     if (!_valid_lz4f_block_size_id(block_id)) {
@@ -139,6 +151,7 @@ PyDoc_STRVAR(_lz4framed_compress__doc__,
 "                 range for hc compression is between 4 and 9, with a maximum of 16.\n"
 "\n"
 "Raises:\n"
+"    LZ4FNoDataError: If provided data is of zero length. (Useful for ending compression loop.)\n"
 "    Lz4FramedError: If a compression failure occured");
 #define FUNC_DEF_COMPRESS {"compress", (PyCFunction)_lz4framed_compress, METH_VARARGS | METH_KEYWORDS,\
                            _lz4framed_compress__doc__}
@@ -151,7 +164,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
 #endif
     static char *keywords[] = {"b", "block_size_id", "block_mode_linked", "checksum", "level", NULL};
 
-    LZ4F_preferences_t prefs = {{0}, 0, 0, {0}};
+    LZ4F_preferences_t prefs = prefs_defaults;
     const char *input;
     Py_ssize_t input_len;
     int block_id = LZ4F_default;
@@ -168,7 +181,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
         goto bail;
     }
     if (input_len <= 0) {
-        PyErr_SetString(PyExc_ValueError, "b (data) is empty");
+        PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
     if (!_valid_lz4f_block_size_id(block_id)) {
@@ -221,6 +234,7 @@ PyDoc_STRVAR(_lz4framed_decompress__doc__,
 "                       parameter is ignored.\n"
 "\n"
 "Raises:\n"
+"    LZ4FNoDataError: If provided data is of zero length\n"
 "    Lz4FramedError: If a decompression failure occured");
 #define FUNC_DEF_DECOMPRESS {"decompress", (PyCFunction)_lz4framed_decompress, METH_VARARGS | METH_KEYWORDS,\
                              _lz4framed_decompress__doc__}
@@ -237,8 +251,9 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
     LZ4F_decompressOptions_t opt = {0, {0}};
     LZ4F_frameInfo_t frame_info;
     const char *input_pos;          // position in input
-    size_t input_read;              // used by LZ4 functions to indicate how many bytes were / can be read
+    Py_ssize_t input_len;           // bytes remaining in input
     size_t input_remaining;         // bytes remaining in input
+    size_t input_read;              // used by LZ4 functions to indicate how many bytes were / can be read
     size_t input_size_hint;         // LZ4 hint to how many bytes make up the remaining block + next header
     int buffer_size = 1024;
     PyObject *output = NULL;
@@ -248,18 +263,18 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
     size_t output_written;          // used by LZ4 to indicate how many bytes were / can be written
     UNUSED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &input_pos, &input_remaining, &buffer_size)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &input_pos, &input_len, &buffer_size)) {
         goto bail;
     }
-    if (input_remaining <= 0) {
-        PyErr_Format(PyExc_ValueError, "b (data) is empty");
+    if (input_len <= 0) {
+        PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
     if (buffer_size <= 0) {
         PyErr_Format(PyExc_ValueError, "buffer_size (%d) invalid", buffer_size);
         goto bail;
     }
-    input_read = input_remaining;
+    input_read = input_remaining = input_len;
 
     BAIL_ON_LZ4_ERROR(LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION));
 
@@ -267,7 +282,7 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
     BAIL_ON_LZ4_ERROR(input_size_hint = LZ4F_getFrameInfo(ctx, &frame_info, input_pos, &input_read));
     input_pos += input_read;
     input_remaining = input_read = input_remaining - input_read;
-    if (frame_info.contentSize > 0) {
+    if (frame_info.contentSize) {
         output_len = frame_info.contentSize;
         // Prevent LZ4 from buffering output - works if uncompressed size known since output does not have to be resized
         opt.stableDst = 1;
@@ -281,7 +296,7 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
     BAIL_ON_NULL(output_pos = PyBytes_AsString(output));
     output_remaining = output_written = output_len;
 
-    while (input_size_hint) {
+    while (1) {
         // decompress next chunk
         BAIL_ON_LZ4_ERROR(input_size_hint = LZ4F_decompress(ctx, output_pos, &output_written, input_pos, &input_read,
                                                             &opt));
@@ -296,8 +311,8 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
             break;
         }
         // destination too small
-        if (input_remaining > 0) {
-            if (frame_info.contentSize > 0) {
+        if (input_remaining) {
+            if (frame_info.contentSize) {
                 // if frame specifies size, should never have to enlarge
                 BAIL_ON_NONZERO(PyErr_WarnEx(PyExc_RuntimeWarning, "lz4frame contentSize mismatch", 2));
             }
@@ -306,6 +321,10 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
             BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
             BAIL_ON_NULL(output_pos = PyBytes_AsString(output));
             output_pos += (output_len - output_remaining);
+        // insufficient data
+        } else {
+            PyErr_SetString(PyExc_ValueError, "frame incomplete");
+            goto bail;
         }
     }
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
@@ -322,10 +341,11 @@ bail:
 /******************************************************************************/
 
 static void _cctx_capsule_destructor(PyObject *py_ctx) {
-    LZ4F_compressionContext_t ctx = (LZ4F_compressionContext_t)PyCapsule_GetPointer(py_ctx, COMPRESSION_CAPSULE_NAME);
-    if (NULL != ctx) {
+    _lz4f_cctx_t *cctx = (_lz4f_cctx_t*)PyCapsule_GetPointer(py_ctx, COMPRESSION_CAPSULE_NAME);
+    if (NULL != cctx) {
         // ignoring errors here since shouldn't throw exception in destructor
-        LZ4F_freeCompressionContext(ctx);
+        LZ4F_freeCompressionContext(cctx->ctx);
+        PyMem_Del(cctx);
     }
 }
 
@@ -348,16 +368,27 @@ PyDoc_STRVAR(_lz4framed_create_compression_context__doc__,
                               _lz4framed_create_compression_context__doc__}
 static PyObject*
 _lz4framed_create_compression_context(PyObject *self, PyObject *args) {
-    LZ4F_compressionContext_t ctx = NULL;
+    static
+    _lz4f_cctx_t *cctx = NULL;
     UNUSED(self);
     UNUSED(args);
 
-    BAIL_ON_LZ4_ERROR(LZ4F_createCompressionContext(&ctx, LZ4F_VERSION));
-    return PyCapsule_New(ctx, COMPRESSION_CAPSULE_NAME, _cctx_capsule_destructor);
+    if (NULL == (cctx = PyMem_New(_lz4f_cctx_t, 1))) {
+        PyErr_NoMemory();
+        goto bail;
+    }
+    cctx->ctx = NULL;
+    cctx->prefs = prefs_defaults;
+
+    BAIL_ON_LZ4_ERROR(LZ4F_createCompressionContext(&(cctx->ctx), LZ4F_VERSION));
+    return PyCapsule_New(cctx, COMPRESSION_CAPSULE_NAME, _cctx_capsule_destructor);
 
 bail:
-    // must NOT be freed once capsule exists (since destructor responsible for freeing)
-    LZ4F_freeCompressionContext(ctx);
+    // this must NOT be freed once capsule exists (since destructor responsible for freeing)
+    if (cctx) {
+        LZ4F_freeCompressionContext(cctx->ctx);
+        PyMem_Del(cctx);
+    }
     return NULL;
 }
 
@@ -413,8 +444,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
     static const char *format = "O|iiiii:compress_begin";
     static char *keywords[] = {"ctx", "block_size_id", "block_mode_linked", "checksum", "autoflush", "level", NULL};
 
-    LZ4F_preferences_t prefs = {{0}, 0, 0, {0}};
-    LZ4F_compressionContext_t ctx;
+    _lz4f_cctx_t *cctx;
     PyObject *ctx_capsule;
     int block_id = LZ4F_default;
     int block_mode_linked = 1;
@@ -444,18 +474,18 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
     }
 
     // Guaranteed to succeed due to PyCapsule_IsValid check above
-    ctx = PyCapsule_GetPointer(ctx_capsule, COMPRESSION_CAPSULE_NAME);
+    cctx = PyCapsule_GetPointer(ctx_capsule, COMPRESSION_CAPSULE_NAME);
 
-    prefs.frameInfo.blockMode = block_mode_linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
-    prefs.frameInfo.blockSizeID = block_id;
-    prefs.frameInfo.contentChecksumFlag = checksum ? LZ4F_contentChecksumEnabled : LZ4F_noContentChecksum;
-    prefs.compressionLevel = compression_level;
-    prefs.autoFlush = autoflush ? 1 : 0;
+    cctx->prefs.frameInfo.blockMode = block_mode_linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
+    cctx->prefs.frameInfo.blockSizeID = block_id;
+    cctx->prefs.frameInfo.contentChecksumFlag = checksum ? LZ4F_contentChecksumEnabled : LZ4F_noContentChecksum;
+    cctx->prefs.compressionLevel = compression_level;
+    cctx->prefs.autoFlush = autoflush ? 1 : 0;
 
     BAIL_ON_NULL(output = PyBytes_FromStringAndSize(NULL, output_len));
     BAIL_ON_NULL(output_str = PyBytes_AsString(output));
 
-    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBegin(ctx, output_str, output_len, &prefs));
+    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBegin(cctx->ctx, output_str, output_len, &(cctx->prefs)));
 
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
     return output;
@@ -479,6 +509,7 @@ PyDoc_STRVAR(_lz4framed_compress_update__doc__,
 "    b (bytes): The object containing lz4-framed data to decompress\n"
 "\n"
 "Raises:\n"
+"    LZ4FNoDataError: If provided data is of zero length. (Useful for ending compression loop.)\n"
 "    Lz4FramedError: If a compression failure occured");
 #define FUNC_DEF_COMPRESS_UPDATE {"compress_update", (PyCFunction)_lz4framed_compress_update, METH_VARARGS,\
                                   _lz4framed_compress_update__doc__}
@@ -489,7 +520,7 @@ _lz4framed_compress_update(PyObject *self, PyObject *args) {
 #else
     static const char *format = "Os#:compress_update";
 #endif
-    LZ4F_compressionContext_t ctx;
+    _lz4f_cctx_t *cctx;
     PyObject *ctx_capsule;
     const char *input;
     Py_ssize_t input_len;
@@ -506,17 +537,17 @@ _lz4framed_compress_update(PyObject *self, PyObject *args) {
         goto bail;
     }
     if (input_len <= 0) {
-        PyErr_SetString(PyExc_ValueError, "b (data) is empty");
+        PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
     // Guaranteed to succeed due to PyCapsule_IsValid check above
-    ctx = PyCapsule_GetPointer(ctx_capsule, COMPRESSION_CAPSULE_NAME);
+    cctx = PyCapsule_GetPointer(ctx_capsule, COMPRESSION_CAPSULE_NAME);
 
-    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBound(input_len, NULL));
+    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBound(input_len, &(cctx->prefs)));
     BAIL_ON_NULL(output = PyBytes_FromStringAndSize(NULL, output_len));
     BAIL_ON_NULL(output_str = PyBytes_AsString(output));
 
-    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressUpdate(ctx, output_str, output_len, input, input_len, NULL));
+    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressUpdate(cctx->ctx, output_str, output_len, input, input_len, NULL));
 
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
     return output;
@@ -532,7 +563,9 @@ PyDoc_STRVAR(_lz4framed_compress_end__doc__,
 "compress_end(ctx) -> bytes\n"
 "\n"
 "Flushes any remaining compressed data, finalises frame and returns said data. After\n"
-"successful decompressino the context can be re-used for another frame.\n"
+"successful compression the context can be re-used for another frame. Note: Calling\n"
+"this function without having written any data (via compress_update()) will produce\n"
+"an invalid frame.\n"
 "\n"
 "Args:\n"
 "    ctx: Compression context\n"
@@ -543,8 +576,7 @@ PyDoc_STRVAR(_lz4framed_compress_end__doc__,
                                _lz4framed_compress_end__doc__}
 static PyObject*
 _lz4framed_compress_end(PyObject *self, PyObject *arg) {
-    LZ4F_compressionContext_t ctx;
-
+    _lz4f_cctx_t *cctx;
     PyObject *output = NULL;
     char *output_str;
     size_t output_len;
@@ -555,13 +587,13 @@ _lz4framed_compress_end(PyObject *self, PyObject *arg) {
         goto bail;
     }
     // Guaranteed to succeed due to PyCapsule_IsValid check above
-    ctx = PyCapsule_GetPointer(arg, COMPRESSION_CAPSULE_NAME);
+    cctx = PyCapsule_GetPointer(arg, COMPRESSION_CAPSULE_NAME);
 
-    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBound(0, NULL));
+    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBound(0, &(cctx->prefs)));
     BAIL_ON_NULL(output = PyBytes_FromStringAndSize(NULL, output_len));
     BAIL_ON_NULL(output_str = PyBytes_AsString(output));
 
-    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressEnd(ctx, output_str, output_len, NULL));
+    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressEnd(cctx->ctx, output_str, output_len, NULL));
 
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
     return output;
@@ -673,6 +705,7 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     LZ4F_decompressionContext_t ctx;
     PyObject *ctx_capsule;
     const char *input_pos;           // position in input
+    Py_ssize_t input_len;
     size_t input_remaining;          // bytes remaining in input
     size_t input_read;               // used by LZ4 functions to indicate how many bytes were / can be read
     size_t input_size_hint = 1;      // LZ4 hint to how many bytes make up the remaining block + next header
@@ -685,7 +718,7 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     size_t chunk_written;            // used by lz4 to indicate how much has been written
     UNUSED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &ctx_capsule, &input_pos, &input_remaining,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &ctx_capsule, &input_pos, &input_len,
                                      &chunk_len)) {
         goto bail;
     }
@@ -693,8 +726,8 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_SetString(PyExc_ValueError, "ctx invalid");
         goto bail;
     }
-    if (input_remaining <= 0) {
-        PyErr_SetString(PyExc_ValueError, "b (data) is empty");
+    if (input_len <= 0) {
+        PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
     if (chunk_len <= 0) {
@@ -704,7 +737,7 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     // Guaranteed to succeed due to PyCapsule_IsValid check above
     ctx = PyCapsule_GetPointer(ctx_capsule, DECOMPRESSION_CAPSULE_NAME);
 
-    input_read = input_remaining;
+    input_read = input_remaining = input_len;
 
     // output list
     BAIL_ON_NULL(list = PyList_New(0));
@@ -714,8 +747,8 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     BAIL_ON_NULL(chunk_pos = PyBytes_AsString(chunk));
     chunk_remaining = chunk_written = chunk_len;
 
-    while (input_remaining > 0 && input_size_hint > 0) {
-        if (chunk_remaining <= 0) {
+    while (input_remaining && input_size_hint) {
+        if (!chunk_remaining) {
             // append previous (full) chunk to list
             BAIL_ON_NONZERO(PyList_Append(list, chunk));
             Py_CLEAR(chunk);
@@ -817,13 +850,16 @@ init_lz4framed(void)
     BAIL_ON_NULL(module);
     BAIL_ON_NULL(state = GETSTATE(module));
 
-    BAIL_ON_NULL(state->error = PyErr_NewExceptionWithDoc("_lz4framed.Lz4FramedError", __lz4f_error__doc__, NULL,
-                                                          NULL));
-    LZ4FError = state->error;
+    BAIL_ON_NULL(state->error = PyErr_NewException("_lz4framed.Error", NULL, NULL));
+    BAIL_ON_NULL(LZ4FError = PyErr_NewExceptionWithDoc("_lz4framed.Lz4FramedError", __lz4f_error__doc__, NULL, NULL));
+    BAIL_ON_NULL(LZ4FNoDataError = PyErr_NewExceptionWithDoc("_lz4framed.Lz4FramedNoDataError",
+                                                             __lz4f_no_data_error__doc__, NULL, NULL));
     Py_INCREF(LZ4FError);
+    Py_INCREF(LZ4FNoDataError);
 
     // non-zero returns indicate error
     if (PyModule_AddObject(module, "Lz4FramedError", LZ4FError) ||
+        PyModule_AddObject(module, "Lz4FramedNoDataError", LZ4FNoDataError) ||
         PyModule_AddStringConstant(module, "__version__", VERSION) ||
         // defined at compile time, is of the form "r123"
         PyModule_AddStringConstant(module, "LZ4_VERSION", LZ4_VERSION) ||
@@ -849,8 +885,8 @@ init_lz4framed(void)
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_DEFAULT", LZ4F_default) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX64KB", LZ4F_max64KB) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX256KB", LZ4F_max256KB) ||
-        PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX1M", LZ4F_max1MB) ||
-        PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX4M", LZ4F_max4MB)) {
+        PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX1MB", LZ4F_max1MB) ||
+        PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX4MB", LZ4F_max4MB)) {
         goto bail;
     }
 
@@ -861,6 +897,8 @@ init_lz4framed(void)
 #endif
 
 bail:
+    Py_XINCREF(LZ4FError);
+    Py_XINCREF(LZ4FNoDataError);
     Py_XDECREF(module);
     INITERROR;
 }

@@ -37,8 +37,6 @@ except ImportError:
 PY2 = (version_info[0] == 2)
 
 if PY2:
-    from io import StringIO as BytesIO  # noqa
-
     # pylint: disable=undefined-variable
     integer_types = (int, long)  # noqa
     unicode_type = unicode  # noqa
@@ -53,8 +51,6 @@ if PY2:
     stderr_raw = stderr
 
 else:
-    from io import BytesIO  # noqa
-
     integer_types = (int,)
     unicode_type = str
     text_types = (str,)
