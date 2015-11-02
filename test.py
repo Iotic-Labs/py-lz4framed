@@ -19,8 +19,8 @@ from lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOC
 
 PY2 = version_info[0] < 3
 
-_shortInput = b'abcdefghijklmnopqrstuvwxyz0123456789'
-_longInput = _shortInput * (10**5)
+SHORT_INPUT = b'abcdefghijklmnopqrstuvwxyz0123456789'
+LONG_INPUT = SHORT_INPUT * (10**5)
 
 
 class TestHelperMixin(object):
@@ -29,20 +29,20 @@ class TestHelperMixin(object):
         super(TestHelperMixin, self).setUp()
         if PY2:
             # avoid deprecation warning
-            self.assertRaisesRegex = self.assertRaisesRegexp
+            self.assertRaisesRegex = self.assertRaisesRegexp  # pylint: disable=invalid-name
 
-    def checkCompressShort(self, *args, **kwargs):
-        self.assertEqual(_shortInput, decompress(compress(_shortInput, *args, **kwargs)))
+    def check_compress_short(self, *args, **kwargs):
+        self.assertEqual(SHORT_INPUT, decompress(compress(SHORT_INPUT, *args, **kwargs)))
 
-    def checkCompressLong(self, *args, **kwargs):
-        self.assertEqual(_longInput, decompress(compress(_longInput, *args, **kwargs)))
+    def check_compress_long(self, *args, **kwargs):
+        self.assertEqual(LONG_INPUT, decompress(compress(LONG_INPUT, *args, **kwargs)))
 
     @contextmanager
-    def assertRaisesLz4FramedError(self, code):
+    def assertRaisesLz4FramedError(self, code):  # pylint: disable=invalid-name
         try:
             yield
-        except Lz4FramedError as e:
-            self.assertEqual(e.args[1], code, 'Lz4FramedError code mismatch: [%d]: %s' % (e.args[1], e.args[0]))
+        except Lz4FramedError as ex:
+            self.assertEqual(ex.args[1], code, 'Lz4FramedError code mismatch: [%d]: %s' % (ex.args[1], ex.args[0]))
         else:
             self.fail('Lz4FramedError not raised')
 
@@ -54,44 +54,44 @@ class TestCompress(TestHelperMixin, TestCase):
             compress()
         with self.assertRaises(Lz4FramedNoDataError):
             compress(b'')
-        self.checkCompressShort()
+        self.check_compress_short()
 
     def test_compress_block_size(self):
         with self.assertRaises(TypeError):
-            compress(_shortInput, block_size_id='1')
+            compress(SHORT_INPUT, block_size_id='1')
         with self.assertRaises(ValueError):
-            compress(_shortInput, block_size_id=-1)
-        for blockSize in (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,
-                          LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB):
-            self.checkCompressShort(block_size_id=blockSize)
-            self.checkCompressLong(block_size_id=blockSize)
+            compress(SHORT_INPUT, block_size_id=-1)
+        for block_size in (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,
+                           LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB):
+            self.check_compress_short(block_size_id=block_size)
+            self.check_compress_long(block_size_id=block_size)
 
     def test_compress_linked_mode(self):
         with self.assertRaises(TypeError):
-            compress(_shortInput, block_mode_linked=None)
-        self.checkCompressShort(block_mode_linked=True)
-        self.checkCompressShort(block_mode_linked=False)
+            compress(SHORT_INPUT, block_mode_linked=None)
+        self.check_compress_short(block_mode_linked=True)
+        self.check_compress_short(block_mode_linked=False)
 
     def test_compress_checksum(self):
         with self.assertRaises(TypeError):
-            compress(_shortInput, checksum=None)
-        self.checkCompressShort(checksum=True)
-        self.checkCompressShort(checksum=False)
-        for data in (_shortInput, _longInput):
+            compress(SHORT_INPUT, checksum=None)
+        self.check_compress_short(checksum=True)
+        self.check_compress_short(checksum=False)
+        for data in (SHORT_INPUT, LONG_INPUT):
             with self.assertRaisesLz4FramedError(LZ4F_ERROR_contentChecksum_invalid):
                 # invalid checksum
                 decompress(compress(data, checksum=True)[:-1] + b'0')
 
     def test_compress_level(self):
         with self.assertRaises(TypeError):
-            compress(_shortInput, level='1')
+            compress(SHORT_INPUT, level='1')
         with self.assertRaises(ValueError):
-            compress(_shortInput, level=-1)
+            compress(SHORT_INPUT, level=-1)
         for level in range(17):
-            self.checkCompressShort(level=level)
+            self.check_compress_short(level=level)
         # large input, fast & hc levels
-        self.checkCompressLong(level=0)
-        self.checkCompressLong(level=16)
+        self.check_compress_long(level=0)
+        self.check_compress_long(level=16)
 
 
 class TestDecompress(TestHelperMixin, TestCase):
@@ -101,23 +101,23 @@ class TestDecompress(TestHelperMixin, TestCase):
             decompress()
         with self.assertRaises(Lz4FramedNoDataError):
             decompress(b'')
-        self.checkCompressShort()
+        self.check_compress_short()
 
     def test_decompress_buffer_size(self):
-        out = compress(_shortInput)
+        out = compress(SHORT_INPUT)
         with self.assertRaises(TypeError):
             decompress(out, buffer_size='1')
         with self.assertRaises(ValueError):
             decompress(out, buffer_size=0)
-        out = compress(_longInput)
+        out = compress(LONG_INPUT)
         for buffer_size in range(1, 1025, 128):
-            self.assertEqual(_longInput, decompress(out, buffer_size=buffer_size))
+            self.assertEqual(LONG_INPUT, decompress(out, buffer_size=buffer_size))
 
     def test_decompress_invalid_input(self):
         with self.assertRaisesLz4FramedError(LZ4F_ERROR_frameHeader_incomplete):
             decompress(b'invalidheader')
         with self.assertRaisesRegex(ValueError, 'frame incomplete'):
-            decompress(compress(_shortInput)[:-5])
+            decompress(compress(SHORT_INPUT)[:-5])
 
 
 class TestLowLevelFunctions(TestHelperMixin, TestCase):
@@ -149,10 +149,10 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
                 'block_size_id': LZ4F_BLOCKSIZE_MAX256KB,
                 'block_mode_linked': False}
         # Using long input since lz4 adjusts block size is input smaller than one block
-        decompress_update(ctx, compress(_longInput, **args)[:15])
+        decompress_update(ctx, compress(LONG_INPUT, **args)[:15])
         info = get_frame_info(ctx)
         self.assertTrue(info.pop('input_hint', 0) > 0)
-        args['length'] = len(_longInput)
+        args['length'] = len(LONG_INPUT)
         self.assertEqual(info, args)
 
     def __compress_begin(self, **kwargs):
@@ -228,17 +228,17 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
             decompress(header + compress_end(ctx))
 
         ctx, header = self.__compress_begin()
-        data = compress_update(ctx, _shortInput)
-        self.assertEqual(decompress(header + data + compress_end(ctx)), _shortInput)
+        data = compress_update(ctx, SHORT_INPUT)
+        self.assertEqual(decompress(header + data + compress_end(ctx)), SHORT_INPUT)
 
     def __compress_with_data_and_args(self, data, **kwargs):
         ctx, header = self.__compress_begin(**kwargs)
-        inRaw = BytesIO(data)
+        in_raw = BytesIO(data)
         out = BytesIO(header)
         out.seek(0, SEEK_END)
         try:
             while True:
-                out.write(compress_update(ctx, inRaw.read(1024)))
+                out.write(compress_update(ctx, in_raw.read(1024)))
         except Lz4FramedNoDataError:
             pass
         out.write(compress_end(ctx))
@@ -249,16 +249,16 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
 
         for size in (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB, LZ4F_BLOCKSIZE_MAX1MB,
                      LZ4F_BLOCKSIZE_MAX4MB):
-            func(_longInput, block_size_id=size)
+            func(LONG_INPUT, block_size_id=size)
 
         for arg in ('block_mode_linked', 'checksum'):
             for value in (False, True):
-                func(_longInput, **{arg: value})
+                func(LONG_INPUT, **{arg: value})
 
         for level in range(17):
-            func(_shortInput, level=level)
-        func(_shortInput, level=0)
-        func(_shortInput, level=16)
+            func(SHORT_INPUT, level=level)
+        func(SHORT_INPUT, level=0)
+        func(SHORT_INPUT, level=16)
 
     def test_decompress_update_invalid(self):
         with self.assertRaises(TypeError):
@@ -276,9 +276,9 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
         with self.assertRaises(ValueError):
             decompress_update(ctx, b' ', chunk_len=0)
 
-        inRaw = compress(_longInput, checksum=True)
+        in_raw = compress(LONG_INPUT, checksum=True)
 
-        ret = decompress_update(ctx, inRaw[:512], chunk_len=2)
+        ret = decompress_update(ctx, in_raw[:512], chunk_len=2)
         # input_hint
         self.assertTrue(ret.pop() > 0)
         # chunk length
@@ -287,13 +287,13 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
 
         # invalid input (from start of frame)
         with self.assertRaisesLz4FramedError(LZ4F_ERROR_GENERIC):
-            decompress_update(ctx, inRaw)
+            decompress_update(ctx, in_raw)
 
         # checksum invalid
-        inRaw = inRaw[:-4] + b'1234'
+        in_raw = in_raw[:-4] + b'1234'
         ctx = create_decompression_context()
         with self.assertRaisesLz4FramedError(LZ4F_ERROR_contentChecksum_invalid):
-            decompress_update(ctx, inRaw)
+            decompress_update(ctx, in_raw)
 
 
 class TestCompressor(TestHelperMixin, TestCase):
@@ -315,40 +315,40 @@ class TestCompressor(TestHelperMixin, TestCase):
                 pass
 
     def test_compressor__no_fp(self):
-        inB = BytesIO(_longInput)
-        outB = BytesIO()
+        in_bytes = BytesIO(LONG_INPUT)
+        out_bytes = BytesIO()
 
-        c = Compressor()
+        compressor = Compressor()
         try:
             while True:
-                outB.write(c.update(inB.read(1024)))
+                out_bytes.write(compressor.update(in_bytes.read(1024)))
         # raised by compressor.update() on empty data argument
         except Lz4FramedNoDataError:
             pass
-        outB.write(c.end())
+        out_bytes.write(compressor.end())
 
-        self.assertEqual(decompress(outB.getvalue()), _longInput)
+        self.assertEqual(decompress(out_bytes.getvalue()), LONG_INPUT)
 
     def test_compressor_fp(self):
         self.__fp_test()
 
-    def __fp_test(self, inRaw=_longInput, **kwargs):
-        inB = BytesIO(inRaw)
-        outB = BytesIO()
+    def __fp_test(self, in_raw=LONG_INPUT, **kwargs):
+        in_bytes = BytesIO(in_raw)
+        out_bytes = BytesIO()
 
-        with Compressor(fp=outB, **kwargs) as c:
+        with Compressor(fp=out_bytes, **kwargs) as compressor:
             try:
                 while True:
-                    c.update(inB.read(1024))
+                    compressor.update(in_bytes.read(1024))
             # raised by compressor.update() on empty data argument
             except Lz4FramedNoDataError:
                 pass
-        self.assertEqual(decompress(outB.getvalue()), inRaw)
+        self.assertEqual(decompress(out_bytes.getvalue()), in_raw)
 
     def test_compressor_block_size(self):
-        for blockSize in (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,
-                          LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB):
-            self.__fp_test(block_size_id=blockSize)
+        for block_size in (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,
+                           LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB):
+            self.__fp_test(block_size_id=block_size)
 
     def test_compressor_checksum(self):
         self.__fp_test(checksum=False)
@@ -360,7 +360,7 @@ class TestCompressor(TestHelperMixin, TestCase):
 
     def test_compressor_level(self):
         for level in range(17):
-            self.__fp_test(inRaw=_shortInput, level=level)
+            self.__fp_test(in_raw=SHORT_INPUT, level=level)
         self.__fp_test(level=0)
         self.__fp_test(level=16)
 
@@ -381,16 +381,16 @@ class TestDecompressor(TestHelperMixin, TestCase):
 
     def test_decompressor_fp(self):
         for level in (0, 16):
-            outB = BytesIO()
-            for chunk in Decompressor(BytesIO(compress(_longInput, level=level))):
-                outB.write(chunk)
-            self.assertEqual(outB.getvalue(), _longInput)
+            out_bytes = BytesIO()
+            for chunk in Decompressor(BytesIO(compress(LONG_INPUT, level=level))):
+                out_bytes.write(chunk)
+            self.assertEqual(out_bytes.getvalue(), LONG_INPUT)
 
         # incomplete frame
-        outB.truncate()
+        out_bytes.truncate()
         with self.assertRaises(Lz4FramedNoDataError):
-            for chunk in Decompressor(BytesIO(compress(_longInput)[:-32])):
-                outB.write(chunk)
+            for chunk in Decompressor(BytesIO(compress(LONG_INPUT)[:-32])):
+                out_bytes.write(chunk)
         # some data should have been written
-        outB.seek(SEEK_END)
-        self.assertTrue(outB.tell() > 0)
+        out_bytes.seek(SEEK_END)
+        self.assertTrue(out_bytes.tell() > 0)
