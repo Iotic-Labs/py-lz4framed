@@ -5,7 +5,7 @@
 from __future__ import print_function
 from sys import argv, stderr
 
-from .compat import stdin_raw, stdout_raw
+from .compat import STDIN_RAW, STDOUT_RAW
 from . import Compressor, Decompressor, Lz4FramedError, Lz4FramedNoDataError, get_block_size
 
 
@@ -13,42 +13,42 @@ def __error(*args, **kwargs):
     print(*args, file=stderr, **kwargs)
 
 
-def do_compress(inStream, outStream):
-    read = inStream.read
-    readSize = get_block_size()
+def do_compress(in_stream, out_stream):
+    read = in_stream.read
+    read_size = get_block_size()
     try:
-        with Compressor(fp=outStream) as c:
+        with Compressor(fp=out_stream) as compressor:
             try:
                 while True:
-                    c.update(read(readSize))
+                    compressor.update(read(read_size))
             # empty read result supplied to update()
             except Lz4FramedNoDataError:
                 pass
             # input stream exception
             except EOFError:
                 pass
-    except Lz4FramedError as e:
-        __error('Compression error: %s' % e)
+    except Lz4FramedError as ex:
+        __error('Compression error: %s' % ex)
         return 8
     return 0
 
 
-def do_decompress(inStream, outStream):
-    write = outStream.write
+def do_decompress(in_stream, out_stream):
+    write = out_stream.write
     try:
-        for chunk in Decompressor(inStream):
+        for chunk in Decompressor(in_stream):
             write(chunk)
-    except Lz4FramedError as e:
-        __error('Compression error: %s' % e)
+    except Lz4FramedError as ex:
+        __error('Compression error: %s' % ex)
         return 8
     return 0
 
 
-__action = frozenset(('compress', 'decompress'))
+__ACTION = frozenset(('compress', 'decompress'))
 
 
 def main():  # noqa (complexity)
-    if not (3 <= len(argv) <= 4 and argv[1] in __action):
+    if not (3 <= len(argv) <= 4 and argv[1] in __ACTION):
         print("""USAGE: lz4framed (compress|decompress) (INFILE|-) [OUTFILE]
 
 (De)compresses an lz4 frame. Input is read from INFILE unless set to '-', in
@@ -56,35 +56,35 @@ which case stdin is used. If OUTFILE is not specified, output goes to stdout."""
         return 1
 
     compress = (argv[1] == 'compress')
-    inFile = outFile = None
+    in_file = out_file = None
     try:
         # input
         if argv[2] == '-':
-            inStream = stdin_raw
+            in_stream = STDIN_RAW
         else:
             try:
-                inStream = inFile = open(argv[2], 'rb')
-            except IOError as e:
-                __error('Failed to open input file for reading: %s' % e)
+                in_stream = in_file = open(argv[2], 'rb')
+            except IOError as ex:
+                __error('Failed to open input file for reading: %s' % ex)
                 return 2
         # output
         if len(argv) == 3:
-            outStream = stdout_raw
+            out_stream = STDOUT_RAW
         else:
             try:
-                outStream = outFile = open(argv[2], 'ab')
-            except IOError as e:
-                __error('Failed to open output file for appending: %s' % e)
+                out_stream = out_file = open(argv[2], 'ab')
+            except IOError as ex:
+                __error('Failed to open output file for appending: %s' % ex)
                 return 4
 
-        return (do_compress if compress else do_decompress)(inStream, outStream)
-    except IOError as e:
-        __error('I/O failure: %s' % e)
+        return (do_compress if compress else do_decompress)(in_stream, out_stream)
+    except IOError as ex:
+        __error('I/O failure: %s' % ex)
     finally:
-        if inFile:
-            inFile.close()
-        if outFile:
-            outFile.close()
+        if in_file:
+            in_file.close()
+        if out_file:
+            out_file.close()
 
 
 if __name__ == "__main__":

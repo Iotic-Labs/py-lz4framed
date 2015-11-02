@@ -72,17 +72,11 @@ confidence=
 # --disable=W"
 #disable=W1608,W1612,W1615,W1637,W1639,W1630,W1625,W1629,I0020,W1607,E1601,W1622,W1616,W1635,W1618,W1617,W1619,W1605,E1604,W1624,E1602,W1613,W1601,I0021,W1627,W1610,W1626,W1638,W1609,W1640,W1606,W1623,W1632,W1634,W1614,W1603,W1636,E1608,E1607,E1603,W1602,W1604,W1611,E1606,W1621,W0704,W1620,E1605,W1633,W1628
 # Custom exclude list:
-# R0801 - duplicate-code
-# R0902 - too-many-instance-attributes
 # R0903 - too-few-public-methods
-# W0212 - protected-access
 # W0511 - ignore fixme/todo for report
-# W0702 - bare-except
 # I0011 - locally-disabled pylint options
-# I0013 - file-ignored
-# C0103 - invalid-name
 # C0111 - missing-docstring
-disable=R0801,R0902,R0903,W0212,W0511,W0702,I0011,I0013,C0103,C0111
+disable=R0903,W0511,I0011,C0111
 
 [REPORTS]
 
@@ -187,11 +181,11 @@ name-group=
 # Include a hint for the correct naming format with invalid-name
 include-naming-hint=no
 
-# Regular expression matching correct variable names
-variable-rgx=[a-z_][a-z0-9_]{2,30}$
+# Regular expression matching correct attribute names
+attr-rgx=[a-z_][a-z0-9_]{2,30}$
 
-# Naming hint for variable names
-variable-name-hint=[a-z_][a-z0-9_]{2,30}$
+# Naming hint for attribute names
+attr-name-hint=[a-z_][a-z0-9_]{2,30}$
 
 # Regular expression matching correct class names
 class-rgx=[A-Z_][a-zA-Z0-9]+$
@@ -199,11 +193,23 @@ class-rgx=[A-Z_][a-zA-Z0-9]+$
 # Naming hint for class names
 class-name-hint=[A-Z_][a-zA-Z0-9]+$
 
-# Regular expression matching correct inline iteration names
-inlinevar-rgx=[A-Za-z_][A-Za-z0-9_]*$
+# Regular expression matching correct class attribute names
+class-attribute-rgx=([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$
 
-# Naming hint for inline iteration names
-inlinevar-name-hint=[A-Za-z_][A-Za-z0-9_]*$
+# Naming hint for class attribute names
+class-attribute-name-hint=([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$
+
+# Regular expression matching correct argument names
+argument-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Naming hint for argument names
+argument-name-hint=[a-z_][a-z0-9_]{2,30}$
+
+# Regular expression matching correct variable names
+variable-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Naming hint for variable names
+variable-name-hint=[a-z_][a-z0-9_]{2,30}$
 
 # Regular expression matching correct function names
 function-rgx=[a-z_][a-z0-9_]{2,30}$
@@ -211,11 +217,17 @@ function-rgx=[a-z_][a-z0-9_]{2,30}$
 # Naming hint for function names
 function-name-hint=[a-z_][a-z0-9_]{2,30}$
 
-# Regular expression matching correct argument names
-argument-rgx=[a-z_][a-z0-9_]{2,30}$
+# Regular expression matching correct module names
+module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
 
-# Naming hint for argument names
-argument-name-hint=[a-z_][a-z0-9_]{2,30}$
+# Naming hint for module names
+module-name-hint=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
+
+# Regular expression matching correct inline iteration names
+inlinevar-rgx=[A-Za-z_][A-Za-z0-9_]*$
+
+# Naming hint for inline iteration names
+inlinevar-name-hint=[A-Za-z_][A-Za-z0-9_]*$
 
 # Regular expression matching correct constant names
 const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__))$
@@ -228,24 +240,6 @@ method-rgx=[a-z_][a-z0-9_]{2,30}$
 
 # Naming hint for method names
 method-name-hint=[a-z_][a-z0-9_]{2,30}$
-
-# Regular expression matching correct attribute names
-attr-rgx=[a-z_][a-z0-9_]{2,30}$
-
-# Naming hint for attribute names
-attr-name-hint=[a-z_][a-z0-9_]{2,30}$
-
-# Regular expression matching correct class attribute names
-class-attribute-rgx=([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$
-
-# Naming hint for class attribute names
-class-attribute-name-hint=([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$
-
-# Regular expression matching correct module names
-module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
-
-# Naming hint for module names
-module-name-hint=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
 
 # Regular expression which should only match function or class names that do
 # not require a docstring.
@@ -325,7 +319,7 @@ spelling-store-unknown-words=no
 [DESIGN]
 
 # Maximum number of arguments for function / method
-max-args=10
+max-args=7
 
 # Argument names that match this expression will be ignored. Default to name
 # with leading underscore
@@ -335,7 +329,7 @@ ignored-argument-names=_.*
 max-locals=15
 
 # Maximum number of return / yield for function / method body
-max-returns=10
+max-returns=6
 
 # Maximum number of branch for function / method body
 max-branches=12
@@ -344,7 +338,7 @@ max-branches=12
 max-statements=50
 
 # Maximum number of parents for a class (see R0901).
-max-parents=11
+max-parents=7
 
 # Maximum number of attributes for a class (see R0902).
 max-attributes=7

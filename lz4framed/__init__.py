@@ -91,7 +91,7 @@ class Compressor(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.end()
 
-    def update(self, b):  # pylint: disable=method-hidden
+    def update(self, b):  # pylint: disable=method-hidden,invalid-name
         """Compress data given in b, returning compressed result either from this function or writing to fp). Note:
            sometimes output might be zero length (if being buffered by lz4).
            Raises Lz4FramedNoDataError if input is of zero length."""
@@ -108,10 +108,10 @@ class Compressor(object):
             return header + output
 
     # post-first update methods so do not require header write & fp checks
-    def __updateNextWrite(self, b):
+    def __updateNextWrite(self, b):  # pylint: disable=invalid-name
         self.__write(compress_update(self.__ctx, b))
 
-    def __updateNextReturn(self, b):
+    def __updateNextReturn(self, b):  # pylint: disable=invalid-name
         return compress_update(self.__ctx, b)
 
     def end(self):
@@ -160,8 +160,8 @@ class Decompressor(__Iterable):
         output = decompress_update(ctx, read(input_hint), chunk_size)
         try:
             self.__info = info = get_frame_info(ctx)
-        except Lz4FramedError as e:
-            if e.args[1] != LZ4F_ERROR_frameHeader_incomplete:
+        except Lz4FramedError as ex:
+            if ex.args[1] != LZ4F_ERROR_frameHeader_incomplete:
                 # should not happen since have read 15 bytes
                 raise
         else:

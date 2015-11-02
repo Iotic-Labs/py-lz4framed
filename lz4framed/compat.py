@@ -30,51 +30,18 @@ from sys import stderr, stdout, stdin, version_info
 
 try:
     # pylint: disable=no-name-in-module
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Iterable
 except ImportError:
-    from collections import Iterable, Mapping, Sequence  # noqa
+    from collections import Iterable  # noqa
 
 PY2 = (version_info[0] == 2)
 
 if PY2:
-    # pylint: disable=undefined-variable
-    integer_types = (int, long)  # noqa
-    unicode_type = unicode  # noqa
-    text_types = (str, unicode)  # noqa
-    bytes_types = (str,)
-
-    def u(item):
-        return unicode(item)  # noqa
-
-    stdin_raw = stdin
-    stdout_raw = stdout
-    stderr_raw = stderr
+    STDIN_RAW = stdin
+    STDOUT_RAW = stdout
+    STDERR_RAW = stderr
 
 else:
-    integer_types = (int,)
-    unicode_type = str
-    text_types = (str,)
-    bytes_types = (bytes, bytearray)
-
-    def u(item):
-        return str(item)
-
-    stdin_raw = stdin.buffer  # pylint: disable=no-member
-    stdout_raw = stdout.buffer  # pylint: disable=no-member
-    stderr_raw = stderr.buffer  # pylint: disable=no-member
-
-if version_info[:2] == (3, 2):
-    # pylint: disable=exec-used
-    exec("""def raise_from(value, from_value):
-    if from_value is None:
-        raise value
-    raise value from from_value
-""")
-elif version_info[:2] > (3, 2):
-    # pylint: disable=exec-used
-    exec("""def raise_from(value, from_value):
-    raise value from from_value
-""")
-else:
-    def raise_from(value, _):
-        raise value
+    STDIN_RAW = stdin.buffer  # pylint: disable=no-member
+    STDOUT_RAW = stdout.buffer  # pylint: disable=no-member
+    STDERR_RAW = stderr.buffer  # pylint: disable=no-member

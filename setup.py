@@ -16,6 +16,8 @@ setup(
     maintainer_email='vilnis.termanis@iotic-labs.com',
     # Change this if/when making public (this is a required field), also add license field
     url='https://github.com/Iotic-Labs/py-lz4framed',
+    # TODO - set once making public
+    # license='???',
     packages=['lz4framed'],
     ext_modules=[
         Extension('_lz4framed', [
