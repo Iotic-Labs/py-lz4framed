@@ -82,4 +82,6 @@ The only existing lz4-frame interoperable implementation I was aware of at the t
 - Lacked support for current lz4 C library release
 - Incomplete implementation in terms of e.g. reference & memory leaks on failure
 - Lack of unit tests
+- Not thread safe
+- Does not release GIL during low level (de)compression operations
 - Did not address the requirements for an external project

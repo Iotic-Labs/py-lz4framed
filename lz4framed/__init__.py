@@ -11,10 +11,11 @@ compressed = lz4framed.compress(b'binary data')
 uncompressed = lz4framed.decompress(compressed)
 
 To use a file-like objects as input/output, use the provided Compressor & Decompressor
-classes instead or manually utilise the context-using low-level methods.
+classes instead or manually utilise the context-using low-level methods. All methods are thread safe unless stated.
 """
 
 from .compat import Iterable as __Iterable
+from threading import Lock
 
 
 # pylint: disable=unused-import
@@ -74,6 +75,7 @@ class Compressor(object):
                 returned by the update(), flush() and end() methods.
         """
         self.__ctx = create_compression_context()
+        self.__lock = Lock()
         if fp is None:
             self.__write = None
         elif not callable(fp.write):
@@ -95,17 +97,18 @@ class Compressor(object):
         """Compress data given in b, returning compressed result either from this function or writing to fp). Note:
            sometimes output might be zero length (if being buffered by lz4).
            Raises Lz4FramedNoDataError if input is of zero length."""
-        output = compress_update(self.__ctx, b)
-        if self.__write:
-            self.__write(self.__header)
-            self.__header = None
-            self.__write(output)
-            self.update = self.__updateNextWrite
-        else:
-            header = self.__header
-            self.__header = None
-            self.update = self.__updateNextReturn
-            return header + output
+        with self.__lock:
+            output = compress_update(self.__ctx, b)
+            if self.__write:
+                self.__write(self.__header)
+                self.__header = None
+                self.__write(output)
+                self.update = self.__updateNextWrite
+            else:
+                header = self.__header
+                self.__header = None
+                self.update = self.__updateNextReturn
+                return header + output
 
     # post-first update methods so do not require header write & fp checks
     def __updateNextWrite(self, b):  # pylint: disable=invalid-name
@@ -116,10 +119,11 @@ class Compressor(object):
 
     def end(self):
         """Finalise lz4 frame, outputting any remaining as return from this function or by writing to fp)"""
-        if self.__write:
-            self.__write(compress_end(self.__ctx))
-        else:
-            return compress_end(self.__ctx)
+        with self.__lock:
+            if self.__write:
+                self.__write(compress_end(self.__ctx))
+            else:
+                return compress_end(self.__ctx)
 
 
 class Decompressor(__Iterable):
@@ -150,6 +154,7 @@ class Decompressor(__Iterable):
             self.__read = fp.read
         self.__info = None
         self.__ctx = create_decompression_context()
+        self.__lock = Lock()
 
     def __iter__(self):
         ctx = self.__ctx
@@ -157,26 +162,27 @@ class Decompressor(__Iterable):
         input_hint = 15  # enough to read largest header
         chunk_size = 32  # output chunk size, will be increased once block size known
 
-        output = decompress_update(ctx, read(input_hint), chunk_size)
-        try:
-            self.__info = info = get_frame_info(ctx)
-        except Lz4FramedError as ex:
-            if ex.args[1] != LZ4F_ERROR_frameHeader_incomplete:
-                # should not happen since have read 15 bytes
-                raise
-        else:
-            chunk_size = get_block_size(info['block_size_id'])
-        input_hint = output.pop()
-
-        # return any data as part of header read, if present
-        for element in output:
-            yield element
-
-        while input_hint > 0:
+        with self.__lock:
             output = decompress_update(ctx, read(input_hint), chunk_size)
+            try:
+                self.__info = info = get_frame_info(ctx)
+            except Lz4FramedError as ex:
+                if ex.args[1] != LZ4F_ERROR_frameHeader_incomplete:
+                    # should not happen since have read 15 bytes
+                    raise
+            else:
+                chunk_size = get_block_size(info['block_size_id'])
             input_hint = output.pop()
+
+            # return any data as part of header read, if present
             for element in output:
                 yield element
+
+            while input_hint > 0:
+                output = decompress_update(ctx, read(input_hint), chunk_size)
+                input_hint = output.pop()
+                for element in output:
+                    yield element
 
     @property
     def frame_info(self):

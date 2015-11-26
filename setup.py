@@ -2,7 +2,7 @@
 
 from distutils.core import setup, Extension
 
-VERSION = '0.6'
+VERSION = '0.7'
 # see lz4/NEWS
 LZ4_VERSION = 'r131'
 
