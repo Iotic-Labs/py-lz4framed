@@ -36,7 +36,7 @@
 
 """Python v2.7 (NOT 2.6) compatibility"""
 
-# pylint: disable=unused-import
+# pylint: disable=unused-import,invalid-name,wrong-import-order
 
 from sys import stderr, stdout, stdin, version_info
 
@@ -54,6 +54,6 @@ if PY2:
     STDERR_RAW = stderr
 
 else:
-    STDIN_RAW = stdin.buffer  # pylint: disable=no-member
-    STDOUT_RAW = stdout.buffer  # pylint: disable=no-member
-    STDERR_RAW = stderr.buffer  # pylint: disable=no-member
+    STDIN_RAW = stdin.buffer  # pylint: disable=no-member,redefined-variable-type
+    STDOUT_RAW = stdout.buffer  # pylint: disable=no-member,redefined-variable-type
+    STDERR_RAW = stderr.buffer  # pylint: disable=no-member,redefined-variable-type

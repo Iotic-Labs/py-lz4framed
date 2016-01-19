@@ -28,6 +28,9 @@
 #define MAX(x, y) (x) >= (y) ? (x) : (y)
 #define KB *(1<<10)
 #define MB *(1<<20)
+#define LZ4_COMPRESSION_MIN 0
+#define LZ4_COMPRESSION_MAX 16
+
 
 #define _BAIL_ON_LZ4_ERROR(code, without_gil) {\
     size_t __err;\
@@ -55,9 +58,6 @@
     }\
 }
 #define BAIL_ON_LZ4_ERROR(code) _BAIL_ON_LZ4_ERROR((code), 0)
-
-// TODO - test with & without locking (+print out)
-#undef WITH_THREAD
 
 #ifdef WITH_THREAD
     #include <pythread.h>
@@ -232,7 +232,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
     int block_id = LZ4F_default;
     int block_mode_linked = 1;
     int checksum = 0;
-    int compression_level = 0;
+    int compression_level = LZ4_COMPRESSION_MIN;
     PyObject *output = NULL;
     char * output_str;
     size_t output_len;
@@ -250,7 +250,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_Format(PyExc_ValueError, "block_size_id (%d) invalid", block_id);
         goto bail;
     }
-    if (compression_level < 0 || compression_level > 16) {
+    if (compression_level < LZ4_COMPRESSION_MIN || compression_level > LZ4_COMPRESSION_MAX) {
         PyErr_Format(PyExc_ValueError, "compression_level (%d) invalid", compression_level);
         goto bail;
     }
@@ -265,7 +265,11 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
     BAIL_ON_NULL(output = PyBytes_FromStringAndSize(NULL, output_len));
     BAIL_ON_NULL(output_str = PyBytes_AsString(output));
 
-    BAIL_ON_LZ4_ERROR_NOGIL(output_len = LZ4F_compressFrame(output_str, output_len, input, input_len, &prefs));
+    if (input_len < NOGIL_COMPRESS_INPUT_SIZE_THRESHOLD) {
+        BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressFrame(output_str, output_len, input, input_len, &prefs));
+    } else {
+        BAIL_ON_LZ4_ERROR_NOGIL(output_len = LZ4F_compressFrame(output_str, output_len, input, input_len, &prefs));
+    }
     // output length might be shorter than estimated
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
     return output;
@@ -355,7 +359,7 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
     // set up initial output buffer
     BAIL_ON_NULL(output = PyBytes_FromStringAndSize(NULL, output_len));
     BAIL_ON_NULL(output_pos = PyBytes_AsString(output));
-    output_remaining = output_written = output_len;
+    output_written = output_remaining = output_len;
 
     while (1) {
         // Decompress next chunk (Releasing GIL if input is very small could be inefficient)
@@ -367,22 +371,23 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
                                                                       &input_read, &opt));
         }
         output_pos += output_written;
-        output_remaining = output_written = output_remaining - output_written;
-        input_pos += input_read;
-        input_remaining = input_read = input_remaining - input_read;
-
-        // decompression complete
+        output_written = output_remaining = (output_remaining - output_written);
+        // decompression complete (i.e. all data provided & fits within output buffer0
         if (!input_size_hint) {
             output_len -= output_remaining;
             break;
         }
+
+        input_pos += input_read;
+        input_read = input_remaining = (input_remaining - input_read);
         // destination too small
         if (input_remaining) {
             if (frame_info.contentSize) {
                 // if frame specifies size, should never have to enlarge
                 BAIL_ON_NONZERO(PyErr_WarnEx(PyExc_RuntimeWarning, "lz4frame contentSize mismatch", 2));
             }
-            output_remaining = output_written += output_len;
+            output_remaining += output_len;
+            output_written = output_remaining;
             output_len *= 2;
             BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
             BAIL_ON_NULL(output_pos = PyBytes_AsString(output));
@@ -441,6 +446,7 @@ PyDoc_STRVAR(_lz4framed_create_compression_context__doc__,
 static PyObject*
 _lz4framed_create_compression_context(PyObject *self, PyObject *args) {
     _lz4f_cctx_t *cctx = NULL;
+    PyObject *ctx_capsule = NULL;
     UNUSED(self);
     UNUSED(args);
 
@@ -457,7 +463,8 @@ _lz4framed_create_compression_context(PyObject *self, PyObject *args) {
     }
 #endif
     BAIL_ON_LZ4_ERROR(LZ4F_createCompressionContext(&(cctx->ctx), LZ4F_VERSION));
-    return PyCapsule_New(cctx, COMPRESSION_CAPSULE_NAME, _cctx_capsule_destructor);
+    BAIL_ON_NULL(ctx_capsule = PyCapsule_New(cctx, COMPRESSION_CAPSULE_NAME, _cctx_capsule_destructor));
+    return ctx_capsule;
 
 bail:
     // this must NOT be freed once capsule exists (since destructor responsible for freeing)
@@ -484,6 +491,7 @@ PyDoc_STRVAR(_lz4framed_create_decompression_context__doc__,
 static PyObject*
 _lz4framed_create_decompression_context(PyObject *self, PyObject *args) {
     _lz4f_dctx_t *dctx = NULL;
+    PyObject *dctx_capsule;
     UNUSED(self);
     UNUSED(args);
 
@@ -499,7 +507,8 @@ _lz4framed_create_decompression_context(PyObject *self, PyObject *args) {
     }
 #endif
     BAIL_ON_LZ4_ERROR(LZ4F_createDecompressionContext(&(dctx->ctx), LZ4F_VERSION));
-    return PyCapsule_New(dctx, DECOMPRESSION_CAPSULE_NAME, _dctx_capsule_destructor);
+    BAIL_ON_NULL(dctx_capsule = PyCapsule_New(dctx, DECOMPRESSION_CAPSULE_NAME, _dctx_capsule_destructor));
+    return dctx_capsule;
 
 bail:
     // this must NOT be freed once capsule exists (since destructor responsible for freeing)
@@ -550,7 +559,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
     int block_mode_linked = 1;
     int checksum = 0;
     int autoflush = 0;
-    int compression_level = 0;
+    int compression_level = LZ4_COMPRESSION_MIN;
     PyObject *output = NULL;
     char *output_str;
     size_t output_len = 15;  // maximum header size
@@ -569,7 +578,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_Format(PyExc_ValueError, "block_size_id (%d) invalid", block_id);
         goto bail;
     }
-    if (compression_level < 0 || compression_level > 16) {
+    if (compression_level < LZ4_COMPRESSION_MIN || compression_level > LZ4_COMPRESSION_MAX) {
         PyErr_Format(PyExc_ValueError, "compression_level (%d) invalid", compression_level);
         goto bail;
     }
@@ -875,18 +884,20 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     // first chunk
     BAIL_ON_NULL(chunk = PyBytes_FromStringAndSize(NULL, chunk_len));
     BAIL_ON_NULL(chunk_pos = PyBytes_AsString(chunk));
-    chunk_remaining = chunk_written = chunk_len;
+    chunk_written = chunk_remaining = chunk_len;
 
     ENTER_LZ4FRAMED(dctx);
 
     while (input_remaining && input_size_hint) {
+        // add another chunk for more data when current one full
         if (!chunk_remaining) {
             // append previous (full) chunk to list
             BAIL_ON_NONZERO(PyList_Append(list, chunk));
             Py_CLEAR(chunk);
+            // create next chunk
             BAIL_ON_NULL(chunk = PyBytes_FromStringAndSize(NULL, chunk_len));
             BAIL_ON_NULL(chunk_pos = PyBytes_AsString(chunk));
-            chunk_remaining = chunk_written = chunk_len;
+            chunk_written = chunk_remaining = chunk_len;
         }
         if (chunk_written < NOGIL_DECOMPRESS_OUTPUT_SIZE_THRESHOLD) {
             BAIL_ON_LZ4_ERROR(input_size_hint = LZ4F_decompress(dctx->ctx, chunk_pos, &chunk_written, input_pos,
@@ -896,9 +907,9 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
                                                                       &input_read, NULL));
         }
         chunk_pos += chunk_written;
-        chunk_remaining = chunk_written = chunk_remaining - chunk_written;
+        chunk_written = chunk_remaining = (chunk_remaining - chunk_written);
         input_pos += input_read;
-        input_remaining = input_read = input_remaining - input_read;
+        input_read = input_remaining = (input_remaining - input_read);
     }
 
     EXIT_LZ4FRAMED(dctx);
@@ -907,11 +918,11 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     if (chunk_remaining < chunk_len) {
         BAIL_ON_NONZERO(_PyBytes_Resize(&chunk, chunk_len - chunk_remaining));
         BAIL_ON_NONZERO(PyList_Append(list, chunk));
-        Py_CLEAR(chunk);
     }
     // append input size hint to list
     BAIL_ON_NULL(size_hint = PyLong_FromSize_t(input_size_hint));
     BAIL_ON_NONZERO(PyList_Append(list, size_hint));
+    Py_CLEAR(chunk);
     Py_CLEAR(size_hint);
 
     return list;
@@ -1027,7 +1038,9 @@ init_lz4framed(void)
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX64KB", LZ4F_max64KB) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX256KB", LZ4F_max256KB) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX1MB", LZ4F_max1MB) ||
-        PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX4MB", LZ4F_max4MB)) {
+        PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX4MB", LZ4F_max4MB) ||
+        PyModule_AddIntConstant(module, "LZ4F_COMPRESSION_MIN", LZ4_COMPRESSION_MIN) ||
+        PyModule_AddIntConstant(module, "LZ4F_COMPRESSION_MAX", LZ4_COMPRESSION_MAX)) {
         goto bail;
     }
 

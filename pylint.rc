@@ -7,9 +7,6 @@
 # pygtk.require().
 #init-hook=
 
-# Profiled execution.
-profile=no
-
 # Add files or directories to the blacklist. They should be base names, not
 # paths.
 ignore=CVS
@@ -20,14 +17,6 @@ persistent=no
 # List of plugins (as comma separated values of python modules names) to load,
 # usually to register additional checkers.
 load-plugins=
-
-# Deprecated. It was used to include message's id in output. Use --msg-template
-# instead.
-# include-ids=no
-
-# Deprecated. It was used to include symbolic ids of messages in output. Use
-# --msg-template instead.
-# symbols=no
 
 # Use multiple processes to speed up Pylint.
 jobs=2
@@ -70,7 +59,7 @@ confidence=
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use"--disable=all --enable=classes
 # --disable=W"
-#disable=W1608,W1612,W1615,W1637,W1639,W1630,W1625,W1629,I0020,W1607,E1601,W1622,W1616,W1635,W1618,W1617,W1619,W1605,E1604,W1624,E1602,W1613,W1601,I0021,W1627,W1610,W1626,W1638,W1609,W1640,W1606,W1623,W1632,W1634,W1614,W1603,W1636,E1608,E1607,E1603,W1602,W1604,W1611,E1606,W1621,W0704,W1620,E1605,W1633,W1628
+#disable=execfile-builtin,import-star-module-level,no-absolute-import,unicode-builtin,xrange-builtin,raising-string,coerce-builtin,long-builtin,old-octal-literal,dict-iter-method,delslice-method,intern-builtin,oct-method,using-cmp-argument,next-method-called,range-builtin-not-iterating,standarderror-builtin,input-builtin,old-raise-syntax,zip-builtin-not-iterating,backtick,file-builtin,suppressed-message,buffer-builtin,print-statement,dict-view-method,hex-method,coerce-method,raw_input-builtin,old-ne-operator,useless-suppression,apply-builtin,cmp-builtin,setslice-method,parameter-unpacking,filter-builtin-not-iterating,reduce-builtin,old-division,reload-builtin,unichr-builtin,long-suffix,nonzero-method,unpacking-in-except,basestring-builtin,indexing-exception,map-builtin-not-iterating,round-builtin,metaclass-assignment,getslice-method,cmp-method
 # Custom exclude list:
 # R0903 - too-few-public-methods
 # W0511 - ignore fixme/todo for report
@@ -99,10 +88,6 @@ reports=no
 # number of statements analyzed. This is used by the global evaluation report
 # (RP0004).
 evaluation=10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
-
-# Add a comment according to your evaluation note. This is used by the global
-# evaluation report (RP0004).
-comment=no
 
 # Template used to display messages. This is a python new-style format string
 # used to format the message information. See doc for all details
@@ -143,17 +128,20 @@ ignore-long-lines=^\s*(# )?<?https?://\S+>?$
 # else.
 single-line-if-stmt=no
 
-# List of optional constructs for which whitespace checking is disabled
+# List of optional constructs for which whitespace checking is disabled. `dict-
+# separator` is used to allow tabulation in dicts, etc.: {1  : 1,\n222: 2}.
+# `trailing-comma` allows a space between comma and closing bracket: (a, ).
+# `empty-line` allows space-only lines.
 no-space-check=trailing-comma,dict-separator
 
 # Maximum number of lines in a module
 max-module-lines=1000
 
-# String used as indentation unit. This is usually " " (4 spaces) or "\t" (1
+# String used as indentation unit. This is usually "    " (4 spaces) or "\t" (1
 # tab).
 indent-string='    '
 
-# Number of spaces of indent required inside a hanging or continued line.
+# Number of spaces of indent required inside a hanging  or continued line.
 indent-after-paren=4
 
 # Expected format of line ending, e.g. empty (any line ending), LF or CRLF.
@@ -162,14 +150,11 @@ expected-line-ending-format=LF
 
 [BASIC]
 
-# Required attributes for module, separated by a comma
-required-attributes=
-
 # List of builtins function names that should not be used, separated by a comma
 bad-functions=map,filter
 
 # Good variable names which should always be accepted, separated by a comma
-good-names=i,j,k,ex,Run,_,setUp
+good-names=i,j,k,ex,Run,_,setUp,fp
 
 # Bad variable names which should always be refused, separated by a comma
 bad-names=foo,bar,baz,toto,tutu,tata
@@ -243,7 +228,7 @@ method-name-hint=[a-z_][a-z0-9_]{2,30}$
 
 # Regular expression which should only match function or class names that do
 # not require a docstring.
-no-docstring-rgx=__.*__
+no-docstring-rgx=^_
 
 # Minimum line length for functions/classes that require docstrings, shorter
 # ones are exempt.
@@ -258,19 +243,17 @@ ignore-mixin-members=yes
 
 # List of module names for which member attributes should not be checked
 # (useful for modules/projects where namespaces are manipulated during runtime
-# and thus existing member attributes cannot be deduced by static analysis
+# and thus existing member attributes cannot be deduced by static analysis. It
+# supports qualified module names, as well as Unix pattern matching.
 ignored-modules=
 
 # List of classes names for which member attributes should not be checked
-# (useful for classes with attributes dynamically set).
+# (useful for classes with attributes dynamically set). This supports can work
+# with qualified names.
 ignored-classes=
 
-# When zope mode is activated, add a predefined set of Zope acquired attributes
-# to generated-members.
-zope=no
-
 # List of members which are set dynamically and missed by pylint inference
-# system, and so shouldn't trigger E0201 when accessed. Python regular
+# system, and so shouldn't trigger E1101 when accessed. Python regular
 # expressions are accepted.
 generated-members=
 
@@ -297,6 +280,12 @@ additional-builtins=
 # List of strings which can identify a callback function by name. A callback
 # name must start or end with one of those strings.
 callbacks=
+
+
+[ELIF]
+
+# Maximum number of nested blocks for function / method body
+max-nested-blocks=5
 
 
 [SPELLING]
@@ -349,11 +338,14 @@ min-public-methods=2
 # Maximum number of public methods for a class (see R0904).
 max-public-methods=20
 
+# Maximum number of boolean expressions in a if statement
+max-bool-expr=5
+
 
 [IMPORTS]
 
 # Deprecated modules which should not be used, separated by a comma
-deprecated-modules=stringprep,optparse
+deprecated-modules=optparse
 
 # Create a graph of every (i.e. internal and external) dependencies in the
 # given file (report RP0402 must not be disabled)
@@ -369,10 +361,6 @@ int-import-graph=
 
 
 [CLASSES]
-
-# List of interface methods to ignore, separated by a comma. This is used for
-# instance to not check methods defines in Zope's Interface base class.
-ignore-iface-methods=
 
 # List of method names used to declare (i.e. assign) instance attributes.
 defining-attr-methods=__init__,__new__,setUp

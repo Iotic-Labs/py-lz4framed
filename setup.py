@@ -15,7 +15,7 @@
 
 from distutils.core import setup, Extension
 
-VERSION = '0.8'
+VERSION = '0.9'
 # see lz4/NEWS
 LZ4_VERSION = 'r131'
 
@@ -44,23 +44,21 @@ setup(
             '-DXXH_NAMESPACE=PLZ4F_',
             '-DVERSION="%s"' % VERSION,
             '-DLZ4_VERSION="%s"' % LZ4_VERSION,
-            # TODO - some of these are GCC-specific
-            '-O3',
-            '-Wall',
-            '-Wextra',
-            '-Wundef',
-            '-Wshadow',
-            '-Wcast-align',
-            '-Wcast-qual',
-            '-Wstrict-prototypes',
-            '-pedantic'
+            # For testing only - some of these are GCC-specific
+            # '-Wall',
+            # '-Wextra',
+            # '-Wundef',
+            # '-Wshadow',
+            # '-Wcast-align',
+            # '-Wcast-qual',
+            # '-Wstrict-prototypes',
+            # '-pedantic'
         ])],
     keywords=('lz4framed', 'lz4frame', 'lz4'),
     classifiers=(
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',
         'Intended Audience :: Developers',
-        # Add license classifier here if available in classifiers list
         'Programming Language :: C',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.7',

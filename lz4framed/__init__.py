@@ -27,13 +27,14 @@ To use a file-like objects as input/output, use the provided Compressor & Decomp
 classes instead or manually utilise the context-using low-level methods. All methods are thread safe unless stated.
 """
 
-from .compat import Iterable as __Iterable
 from threading import Lock
 
+from .compat import Iterable as __Iterable
 
 # pylint: disable=unused-import
 from _lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,  # noqa (unused import)
                         LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB,
+                        LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MAX,
                         LZ4F_ERROR_GENERIC, LZ4F_ERROR_maxBlockSize_invalid, LZ4F_ERROR_blockMode_invalid,
                         LZ4F_ERROR_contentChecksumFlag_invalid, LZ4F_ERROR_compressionLevel_invalid,
                         LZ4F_ERROR_headerVersion_wrong, LZ4F_ERROR_blockChecksum_unsupported,
@@ -73,19 +74,19 @@ class Compressor(object):
         someOutput.append(c.end())
     """
 
-    def __init__(self, block_size_id=LZ4F_BLOCKSIZE_DEFAULT, block_mode_linked=True, checksum=False, autoflush=False,
-                 level=0, fp=None):
+    def __init__(self, fp=None, block_size_id=LZ4F_BLOCKSIZE_DEFAULT, block_mode_linked=True, checksum=False,
+                 autoflush=False, level=LZ4F_COMPRESSION_MIN):
         """
         Args:
+            fp: File like object (supporting write() method) to write compressed data to. If not set, data will be
+                returned by the update(), flush() and end() methods.
             block_size_id (int): Compression block size identifier. One of the LZ4F_BLOCKSIZE_* constants
             block_mode_linked (bool): Whether compression blocks are linked
             checksum (bool): Whether to produce frame checksum
             autoflush (bool): Whether to return (or write to fp) compressed data on each update() call rather than
                               waiting for internal buffer to be filled. (This reduces internal buffer size.)
             level (int): Compression level. Values lower than 3 use fast compression. Recommended
-                         range for hc compression is between 4 and 9, with a maximum of 16.
-            fp: File like object (supporting write() method) to write compressed data to. If not set, data will be
-                returned by the update(), flush() and end() methods.
+                         range for hc compression is between 4 and 9, with a maximum of LZ4_COMPRESSION_MAX.
         """
         self.__ctx = create_compression_context()
         self.__lock = Lock()

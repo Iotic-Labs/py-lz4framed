@@ -131,6 +131,13 @@ class TestDecompress(TestHelperMixin, TestCase):
             decompress(b'invalidheader')
         with self.assertRaisesRegex(ValueError, 'frame incomplete'):
             decompress(compress(SHORT_INPUT)[:-5])
+        # incomplete data (length not specified in header)
+        with BytesIO() as out:
+            with Compressor(out) as compressor:
+                compressor.update(SHORT_INPUT)
+            output = out.getvalue()
+            with self.assertRaisesRegex(ValueError, 'frame incomplete'):
+                decompress(output[:-20])
 
 
 class TestLowLevelFunctions(TestHelperMixin, TestCase):
@@ -314,13 +321,13 @@ class TestCompressor(TestHelperMixin, TestCase):
 
     def test_compressor_init(self):
         with self.assertRaisesRegex(AttributeError, 'has no attribute \'write\''):
-            Compressor(fp='1')
+            Compressor('1')
 
         # non-callable write attribute
         class Empty(object):
             write = 1
         with self.assertRaises(TypeError):
-            Compressor(fp=Empty())
+            Compressor(Empty())
 
         # cannot use context without fp
         with self.assertRaises(ValueError):
@@ -349,7 +356,7 @@ class TestCompressor(TestHelperMixin, TestCase):
         in_bytes = BytesIO(in_raw)
         out_bytes = BytesIO()
 
-        with Compressor(fp=out_bytes, **kwargs) as compressor:
+        with Compressor(out_bytes, **kwargs) as compressor:
             try:
                 while True:
                     compressor.update(in_bytes.read(1024))

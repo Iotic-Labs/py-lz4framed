@@ -30,7 +30,7 @@ def do_compress(in_stream, out_stream):
     read = in_stream.read
     read_size = get_block_size()
     try:
-        with Compressor(fp=out_stream) as compressor:
+        with Compressor(out_stream) as compressor:
             try:
                 while True:
                     compressor.update(read(read_size))
