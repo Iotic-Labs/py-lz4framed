@@ -21,7 +21,7 @@ python3 setup.py build_ext -i
 # Usage
 Single-function operation:
 ```python
-import lz4framed.
+import lz4framed
 
 compressed = lz4framed.compress(b'binary data')
 

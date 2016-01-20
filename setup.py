@@ -15,7 +15,17 @@
 
 from distutils.core import setup, Extension
 
-VERSION = '0.9'
+# For converting markdown README.md
+try:
+    from pypandoc import convert
+except ImportError:
+    READ_MD = lambda f: open(f, 'r').read()
+    print('Warning: pypandoc module not found, will not convert Markdown to RST')
+else:
+    READ_MD = lambda f: convert(f, 'rst')
+
+
+VERSION = '0.9.0'
 # see lz4/NEWS
 LZ4_VERSION = 'r131'
 
@@ -23,9 +33,10 @@ setup(
     name='py-lz4framed',
     version=VERSION,
     description='LZ4Frame library for Python (via C bindings)',
+    long_description=READ_MD('README.md'),
     author='Iotic Labs Ltd',
     author_email='info@iotic-labs.com',
-    maintainer='Vilnis Termanis',
+    maintainer='Iotic Labs Ltd',
     maintainer_email='vilnis.termanis@iotic-labs.com',
     url='https://github.com/Iotic-Labs/py-lz4framed',
     license='Apache License 2.0',
@@ -54,8 +65,8 @@ setup(
             # '-Wstrict-prototypes',
             # '-pedantic'
         ])],
-    keywords=('lz4framed', 'lz4frame', 'lz4'),
-    classifiers=(
+    keywords=['lz4framed', 'lz4frame', 'lz4'],
+    classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',
         'Intended Audience :: Developers',
@@ -67,5 +78,5 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules'
-    )
+    ]
 )

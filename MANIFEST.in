@@ -1,0 +1,3 @@
+include README.md
+global-include NOTICE LICENSE NEWS
+include lz4/*.h
