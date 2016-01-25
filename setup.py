@@ -12,8 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=import-error,wrong-import-order
 
-from distutils.core import setup, Extension
+# Allow for environments without setuptools
+try:
+    from setuptools import setup, Extension
+except ImportError:
+    from ez_setup import use_setuptools
+    use_setuptools()
+    from setuptools import setup, Extension
 
 # For converting markdown README.md
 try:
@@ -41,6 +48,7 @@ setup(
     url='https://github.com/Iotic-Labs/py-lz4framed',
     license='Apache License 2.0',
     packages=['lz4framed'],
+    zip_safe=False,
     ext_modules=[
         Extension('_lz4framed', [
             # lz4 library

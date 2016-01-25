@@ -4,3 +4,6 @@ build/
 dist/
 __pycache__/
 MANIFEST
+*.egg
+.eggs/
+py_lz4framed.egg-info/

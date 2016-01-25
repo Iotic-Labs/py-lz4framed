@@ -5,17 +5,19 @@ This is an [LZ4](http://lz4.org)-frame compression library for Python v3.2+ (and
 
 # Installing / packaging
 ```shell
-# To build & install globally
-python3 setup.py install
-
-# To package
-python3 setup.py bdist
+# To get from PyPI
+pip3 install lz4framed
 
 # To only build extension modules inline (e.g. in repository)
 python3 setup.py build_ext -i
+
+# To build & install globally
+python3 setup.py install
 ```
-**Note**
+**Notes**
+
 - The above as well as all other python3-using commands should also run with v2.7+
+- PyPI releases are signed with the [Iotic Labs Software release signing key](https://iotic-labs.com/iotic-labs.com.asc)
 
 
 # Usage
@@ -79,6 +81,7 @@ python3 -m unittest discover -v .
 
 # Why?
 The only existing lz4-frame interoperable implementation I was aware of at the time of writing ([lz4tools](https://github.com/darkdragn/lz4tools)) had the following limitations:
+
 - Lacked support for current lz4 C library release
 - Incomplete implementation in terms of e.g. reference & memory leaks on failure
 - Lack of unit tests
