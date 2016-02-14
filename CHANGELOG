@@ -1,0 +1,5 @@
+0.9.1
+- Fixup Python 2/3 compat layer for nose (Mathias Laurin)
+
+0.9.0
+- Initial public release
