@@ -82,7 +82,6 @@ python3 -m unittest discover -v .
 # Why?
 The only existing lz4-frame interoperable implementation I was aware of at the time of writing ([lz4tools](https://github.com/darkdragn/lz4tools)) had the following limitations:
 
-- Lacked support for current lz4 C library release
 - Incomplete implementation in terms of e.g. reference & memory leaks on failure
 - Lack of unit tests
 - Not thread safe
