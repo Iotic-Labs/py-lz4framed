@@ -85,7 +85,7 @@ which case stdin is used. If OUTFILE is not specified, output goes to stdout."""
             out_stream = STDOUT_RAW
         else:
             try:
-                out_stream = out_file = open(argv[2], 'ab')
+                out_stream = out_file = open(argv[3], 'ab')
             except IOError as ex:
                 __error('Failed to open output file for appending: %s' % ex)
                 return 4
