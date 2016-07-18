@@ -54,10 +54,6 @@ if PY2:
     STDERR_RAW = stderr
 
 else:
-    STDIN_RAW = stdin.buffer  # pylint: disable=no-member,redefined-variable-type
-    try:
-        # This fix is required with nose that already captures the output.
-        STDOUT_RAW = stdout.buffer  # pylint: disable=no-member,redefined-variable-type
-    except AttributeError:
-        STDOUT_RAW = stdout
-    STDERR_RAW = stderr.buffer  # pylint: disable=no-member,redefined-variable-type
+    STDIN_RAW = getattr(stdin, 'buffer', stdin)
+    STDOUT_RAW = getattr(stdout, 'buffer', stdout)
+    STDERR_RAW = getattr(stderr, 'buffer', stderr)
