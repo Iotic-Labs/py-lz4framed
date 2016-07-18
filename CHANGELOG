@@ -1,3 +1,6 @@
+0.9.3
+- Allow for lack of stdin/stdout/stdout buffer access (#3, https://github.com/windreamer)
+
 0.9.2
 - Fix index in argv (Jan Špaček)
 - License information update

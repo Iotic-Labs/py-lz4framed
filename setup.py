@@ -32,7 +32,7 @@ else:
     READ_MD = lambda f: convert(f, 'rst')
 
 
-VERSION = '0.9.2'
+VERSION = '0.9.3'
 # see lz4/NEWS
 LZ4_VERSION = 'r131'
 
