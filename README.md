@@ -1,6 +1,6 @@
 # Overview
 
-This is an [LZ4](http://lz4.org)-frame compression library for Python v3.2+ (and 2.7+), bound to Yann Collet's [LZ4 C implementation](https://github.com/Cyan4973/lz4).
+This is an [LZ4](http://lz4.org)-frame compression library for Python v3.2+ (and 2.7+), bound to Yann Collet's [LZ4 C implementation](https://github.com/lz4/lz4).
 
 
 # Installing / packaging
