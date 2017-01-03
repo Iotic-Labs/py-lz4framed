@@ -1,4 +1,4 @@
-UNRELEASED
+0.9.4
 - Updated lz4 to v1.7.5 (Note: Available compression levels have changed)
 - Use lz4 constants for available compression levels
 - Use LZ4_VERSION_STRING to propagate underlying lz4 version
