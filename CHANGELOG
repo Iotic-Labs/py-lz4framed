@@ -1,3 +1,9 @@
+UNRELEASED
+- Updated lz4 to v1.7.5 (Note: Available compression levels have changed)
+- Use lz4 constants for available compression levels
+- Use LZ4_VERSION_STRING to propagate underlying lz4 version
+- Update tests to reflect new compression levels
+
 0.9.3
 - Allow for lack of stdin/stdout/stdout buffer access (#3, https://github.com/windreamer)
 

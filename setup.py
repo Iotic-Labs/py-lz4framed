@@ -14,6 +14,8 @@
 
 # pylint: disable=import-error,wrong-import-order
 
+from __future__ import print_function
+
 # Allow for environments without setuptools
 try:
     from setuptools import setup, Extension
@@ -32,9 +34,7 @@ else:
     READ_MD = lambda f: convert(f, 'rst')
 
 
-VERSION = '0.9.3'
-# see lz4/NEWS
-LZ4_VERSION = 'r131'
+VERSION = '0.9.4'
 
 setup(
     name='py-lz4framed',
@@ -62,7 +62,6 @@ setup(
             '-std=c99',
             '-DXXH_NAMESPACE=PLZ4F_',
             '-DVERSION="%s"' % VERSION,
-            '-DLZ4_VERSION="%s"' % LZ4_VERSION,
             # For testing only - some of these are GCC-specific
             # '-Wall',
             # '-Wextra',
@@ -84,6 +83,7 @@ setup(
         'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ]

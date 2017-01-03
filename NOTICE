@@ -2,7 +2,7 @@ py-lz4framed
 Copyright (c) 2016 Iotic Labs Ltd
 
 LZ4 Library
-Copyright (c) 2011-2014 Yann Collet
+Copyright (c) 2011-2016 Yann Collet
 
 six.py
 Copyright (c) 2010-2015 Benjamin Peterson

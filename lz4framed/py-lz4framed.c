@@ -21,6 +21,7 @@
 #include <bytesobject.h>
 
 #include "lz4frame_static.h"
+#include "lz4hc.h"
 
 /******************************************************************************/
 
@@ -29,7 +30,8 @@
 #define KB *(1<<10)
 #define MB *(1<<20)
 #define LZ4_COMPRESSION_MIN 0
-#define LZ4_COMPRESSION_MAX 16
+#define LZ4_COMPRESSION_MIN_HC LZ4HC_CLEVEL_MIN
+#define LZ4_COMPRESSION_MAX LZ4HC_CLEVEL_MAX
 
 
 #define _BAIL_ON_LZ4_ERROR(code, without_gil) {\
@@ -157,9 +159,6 @@ static size_t _lz4f_block_size_from_id(int id) {
     return blockSizes[id];
 }
 
-// TODO - test on 32-bit linux (pi) 2.7 & 3.x
-// TODO - test on windows? http://blog.ionelmc.ro/2014/12/21/compiling-python-extensions-on-windows/
-
 /******************************************************************************/
 
 PyDoc_STRVAR(_lz4framed_get_block_size__doc__,
@@ -209,8 +208,9 @@ PyDoc_STRVAR(_lz4framed_compress__doc__,
 "    block_mode_linked (bool): Whether compression blocks are linked. Better compression\n"
 "                              is achieved in linked mode.\n"
 "    checksum (bool): Whether to produce frame checksum\n"
-"    level (int): Compression level. Values lower than 3 use fast compression. Recommended\n"
-"                 range for hc compression is between 4 and 9, with a maximum of 16.\n"
+"    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC use fast\n"
+"                 compression. Recommended range for hc compression is between 4 and 9,\n"
+"                 with a maximum of LZ4F_COMPRESSION_MAX.\n"
 "\n"
 "Raises:\n"
 "    LZ4FNoDataError: If provided data is of zero length. (Useful for ending compression loop.)\n"
@@ -251,7 +251,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
         goto bail;
     }
     if (compression_level < LZ4_COMPRESSION_MIN || compression_level > LZ4_COMPRESSION_MAX) {
-        PyErr_Format(PyExc_ValueError, "compression_level (%d) invalid", compression_level);
+        PyErr_Format(PyExc_ValueError, "level (%d) invalid", compression_level);
         goto bail;
     }
 
@@ -541,8 +541,9 @@ PyDoc_STRVAR(_lz4framed_compress_begin__doc__,
 "    checksum (bool): Whether to produce frame checksum\n"
 "    autoflush (bool): Whether to flush output on update() calls rather than buffering\n"
 "                      incomplete blocks internally.\n"
-"    level (int): Compression level. Values lower than 3 use fast compression. Recommended\n"
-"                 range for hc compression is between 4 and 9, with a maximum of 16.\n"
+"    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC use fast\n"
+"                 compression. Recommended range for hc compression is between 4 and 9,\n"
+"                 with a maximum of LZ4F_COMPRESSION_MAX.\n"
 "\n"
 "Raises:\n"
 "    Lz4FramedError: If a compression failure occured");
@@ -562,7 +563,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
     int compression_level = LZ4_COMPRESSION_MIN;
     PyObject *output = NULL;
     char *output_str;
-    size_t output_len = 15;  // maximum header size
+    size_t output_len = LZ4F_HEADER_SIZE_MAX;
     LZ4FRAMED_LOCK_FLAG;
     UNUSED(self);
 
@@ -579,7 +580,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
         goto bail;
     }
     if (compression_level < LZ4_COMPRESSION_MIN || compression_level > LZ4_COMPRESSION_MAX) {
-        PyErr_Format(PyExc_ValueError, "compression_level (%d) invalid", compression_level);
+        PyErr_Format(PyExc_ValueError, "level (%d) invalid", compression_level);
         goto bail;
     }
 
@@ -1013,8 +1014,7 @@ init_lz4framed(void)
     if (PyModule_AddObject(module, "Lz4FramedError", LZ4FError) ||
         PyModule_AddObject(module, "Lz4FramedNoDataError", LZ4FNoDataError) ||
         PyModule_AddStringConstant(module, "__version__", VERSION) ||
-        // defined at compile time, is of the form "r123"
-        PyModule_AddStringConstant(module, "LZ4_VERSION", LZ4_VERSION) ||
+        PyModule_AddStringConstant(module, "LZ4_VERSION", LZ4_VERSION_STRING) ||
         PyModule_AddIntMacro(module, LZ4F_VERSION) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_GENERIC) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_maxBlockSize_invalid) ||
@@ -1040,6 +1040,7 @@ init_lz4framed(void)
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX1MB", LZ4F_max1MB) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX4MB", LZ4F_max4MB) ||
         PyModule_AddIntConstant(module, "LZ4F_COMPRESSION_MIN", LZ4_COMPRESSION_MIN) ||
+        PyModule_AddIntConstant(module, "LZ4F_COMPRESSION_MIN_HC", LZ4_COMPRESSION_MIN_HC) ||
         PyModule_AddIntConstant(module, "LZ4F_COMPRESSION_MAX", LZ4_COMPRESSION_MAX)) {
         goto bail;
     }

@@ -34,7 +34,7 @@ from .compat import Iterable as __Iterable
 # pylint: disable=unused-import
 from _lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,  # noqa (unused import)
                         LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB,
-                        LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MAX,
+                        LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MIN_HC, LZ4F_COMPRESSION_MAX,
                         LZ4F_ERROR_GENERIC, LZ4F_ERROR_maxBlockSize_invalid, LZ4F_ERROR_blockMode_invalid,
                         LZ4F_ERROR_contentChecksumFlag_invalid, LZ4F_ERROR_compressionLevel_invalid,
                         LZ4F_ERROR_headerVersion_wrong, LZ4F_ERROR_blockChecksum_unsupported,
