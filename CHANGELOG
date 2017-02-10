@@ -1,3 +1,6 @@
+0.9.5
+- Potential reference leak fix (on LZ4FError being raised)
+
 0.9.4
 - Updated lz4 to v1.7.5 (Note: Available compression levels have changed)
 - Use lz4 constants for available compression levels

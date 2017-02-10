@@ -51,9 +51,9 @@
             PyErr_SetObject(LZ4FError, tuple);\
         /* backup method in case object creation fails */\
         } else {\
-            Py_XDECREF(tuple);\
             PyErr_Format(LZ4FError, "[%zd] %s", __err, LZ4F_getErrorName(__err));\
         }\
+        Py_XDECREF(tuple);\
         Py_XDECREF(num);\
         Py_XDECREF(str);\
         goto bail;\
@@ -702,7 +702,7 @@ PyDoc_STRVAR(_lz4framed_compress_end__doc__,
                                _lz4framed_compress_end__doc__}
 static PyObject*
 _lz4framed_compress_end(PyObject *self, PyObject *arg) {
-    _lz4f_cctx_t *cctx;
+    _lz4f_cctx_t *cctx = NULL;
     PyObject *output = NULL;
     char *output_str;
     size_t output_len;
