@@ -34,7 +34,7 @@ else:
     READ_MD = lambda f: convert(f, 'rst')
 
 
-VERSION = '0.9.5'
+VERSION = '0.9.6'
 
 setup(
     name='py-lz4framed',
@@ -61,7 +61,7 @@ setup(
             '-Ilz4',
             '-std=c99',
             '-DXXH_NAMESPACE=PLZ4F_',
-            '-DVERSION="%s"' % VERSION,
+            '-DVERSION=%s' % VERSION,
             # For testing only - some of these are GCC-specific
             # '-Wall',
             # '-Wextra',

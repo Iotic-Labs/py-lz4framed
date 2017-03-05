@@ -26,6 +26,8 @@
 /******************************************************************************/
 
 #define UNUSED(x) (void)(x)
+#define QUOTE(str) #str
+#define EXPAND_AND_QUOTE(str) QUOTE(str)
 #define MAX(x, y) (x) >= (y) ? (x) : (y)
 #define KB *(1<<10)
 #define MB *(1<<20)
@@ -45,13 +47,13 @@
     }\
     if (LZ4F_isError(__err)) {\
         PyObject *num = NULL, *str = NULL, *tuple = NULL;\
-        if ((num = PyLong_FromSize_t(-__err)) &&\
+        if ((num = PyLong_FromSize_t(-(int)__err)) &&\
             (str = PyUnicode_FromString(LZ4F_getErrorName(__err))) &&\
             (tuple = PyTuple_Pack(2, str, num))) {\
             PyErr_SetObject(LZ4FError, tuple);\
         /* backup method in case object creation fails */\
         } else {\
-            PyErr_Format(LZ4FError, "[%zd] %s", __err, LZ4F_getErrorName(__err));\
+            PyErr_Format(LZ4FError, "[%d] %s", -(int)__err, LZ4F_getErrorName(__err));\
         }\
         Py_XDECREF(tuple);\
         Py_XDECREF(num);\
@@ -1013,7 +1015,7 @@ init_lz4framed(void)
     // non-zero returns indicate error
     if (PyModule_AddObject(module, "Lz4FramedError", LZ4FError) ||
         PyModule_AddObject(module, "Lz4FramedNoDataError", LZ4FNoDataError) ||
-        PyModule_AddStringConstant(module, "__version__", VERSION) ||
+        PyModule_AddStringConstant(module, "__version__", EXPAND_AND_QUOTE(VERSION)) ||
         PyModule_AddStringConstant(module, "LZ4_VERSION", LZ4_VERSION_STRING) ||
         PyModule_AddIntMacro(module, LZ4F_VERSION) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_GENERIC) ||
