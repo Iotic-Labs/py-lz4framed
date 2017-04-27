@@ -158,14 +158,17 @@ class Decompressor(__Iterable):
     def __init__(self, fp):
         """
         Args:
-            fp: File like object (supporting read() method) to read compressed data from.
+            fp: File like object (supporting read() or recv() method) to read compressed data from.
         """
         if fp is None:
             raise TypeError('fp')
-        elif not callable(fp.read):
-            raise TypeError('fp.read not callable')
-        else:
+        elif hasattr(fp, 'read') and callable(fp.read):
             self.__read = fp.read
+        elif hasattr(fp, 'recv') and callable(fp.recv):
+            self.__read = fp.recv
+        else:
+            raise TypeError('fp.read or fp.recv not callable')
+
         self.__info = None
         self.__ctx = create_decompression_context()
         self.__lock = Lock()
