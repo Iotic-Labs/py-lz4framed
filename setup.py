@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=import-error,wrong-import-order
+# pylint: disable=import-error,wrong-import-order,ungrouped-imports
 
 from __future__ import print_function
 
@@ -28,10 +28,10 @@ except ImportError:
 try:
     from pypandoc import convert
 except ImportError:
-    READ_MD = lambda f: open(f, 'r').read()
+    READ_MD = lambda f: open(f, 'r').read()  # noqa: E731
     print('Warning: pypandoc module not found, will not convert Markdown to RST')
 else:
-    READ_MD = lambda f: convert(f, 'rst')
+    READ_MD = lambda f: convert(f, 'rst')  # noqa: E731
 
 
 VERSION = '0.9.7'

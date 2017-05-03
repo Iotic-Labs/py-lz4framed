@@ -111,6 +111,7 @@ class TestCompress(TestHelperMixin, TestCase):
         view = memoryview(LONG_INPUT)
         self.assertEqual(view, decompress(compress(view)))
 
+
 class TestDecompress(TestHelperMixin, TestCase):
 
     def test_decompress_minimal(self):
@@ -146,6 +147,7 @@ class TestDecompress(TestHelperMixin, TestCase):
     def test_decompress_memoryview(self):
         view = memoryview(compress(LONG_INPUT))
         self.assertEqual(LONG_INPUT, decompress(view))
+
 
 class TestLowLevelFunctions(TestHelperMixin, TestCase):
 
@@ -322,7 +324,7 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
         with self.assertRaisesLz4FramedError(LZ4F_ERROR_contentChecksum_invalid):
             decompress_update(ctx, in_raw)
 
-    def test_decompress_update_memoryview(self):
+    def test_decompress_update_memoryview(self):  # pylint: disable=invalid-name
         ctx = create_decompression_context()
         data = decompress_update(ctx, memoryview(compress(LONG_INPUT)))
         self.assertEqual(b''.join(data[:-1]), LONG_INPUT)
@@ -430,21 +432,21 @@ class TestDecompressor(TestHelperMixin, TestCase):
         self.assertTrue(out_bytes.tell() > 0)
 
 
-def pympler_run(iterations=20):
-    from unittest import main
-    from pympler import tracker
-    from gc import collect
+# def pympler_run(iterations=20):
+#     from unittest import main
+#     from pympler import tracker
+#     from gc import collect
 
-    tracker = tracker.SummaryTracker()
-    for i in range(iterations):
-        try:
-            main()
-        except SystemExit:
-            pass
-        if i % 2:
-            collect()
-            tracker.print_diff()
+#     tracker = tracker.SummaryTracker()
+#     for i in range(iterations):
+#         try:
+#             main()
+#         except SystemExit:
+#             pass
+#         if i % 2:
+#             collect()
+#             tracker.print_diff()
 
 
-if __name__ == '__main__':
-    pympler_run()
+# if __name__ == '__main__':
+#     pympler_run()

@@ -29,9 +29,6 @@ classes instead or manually utilise the context-using low-level methods. All met
 
 from threading import Lock
 
-from .compat import Iterable as __Iterable
-
-# pylint: disable=unused-import
 from _lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,  # noqa (unused import)
                         LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB,
                         LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MIN_HC, LZ4F_COMPRESSION_MAX,
@@ -48,6 +45,8 @@ from _lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLO
                         create_compression_context, compress_begin, compress_update, compress_end,
                         create_decompression_context, get_frame_info, decompress_update,
                         get_block_size)
+
+from .compat import Iterable as __Iterable
 
 
 class Compressor(object):
