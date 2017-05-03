@@ -204,7 +204,7 @@ PyDoc_STRVAR(_lz4framed_compress__doc__,
 "result.\n"
 "\n"
 "Args:\n"
-"    b (bytes): The object containing data to compress\n"
+"    b (bytes-like object): The object containing data to compress\n"
 "    block_size_id (int): Compression block size identifier, one of the\n"
 "                         LZ4F_BLOCKSIZE_* constants\n"
 "    block_mode_linked (bool): Whether compression blocks are linked. Better compression\n"
@@ -222,15 +222,15 @@ PyDoc_STRVAR(_lz4framed_compress__doc__,
 static PyObject*
 _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
 #if PY_MAJOR_VERSION >= 3
-    static const char *format = "y#|iiii:compress";
+    static const char *format = "y*|iiii:compress";
 #else
-    static const char *format = "s#|iiii:compress";
+    static const char *format = "s*|iiii:compress";
 #endif
     static char *keywords[] = {"b", "block_size_id", "block_mode_linked", "checksum", "level", NULL};
 
     LZ4F_preferences_t prefs = prefs_defaults;
-    const char *input;
-    Py_ssize_t input_len;
+    Py_buffer input;
+    int input_held = 0; // whether Py_buffer (input) needs to be released
     int block_id = LZ4F_default;
     int block_mode_linked = 1;
     int checksum = 0;
@@ -240,11 +240,17 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
     size_t output_len;
     UNUSED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &input, &input_len, &block_id,
-                                     &block_mode_linked, &checksum, &compression_level)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &input, &block_id, &block_mode_linked, &checksum,
+                                     &compression_level)) {
         goto bail;
     }
-    if (input_len <= 0) {
+    input_held = 1;
+
+    if (!PyBuffer_IsContiguous(&input, 'C')) {
+        PyErr_SetString(PyExc_ValueError, "input not contiguous");
+        goto bail;
+    }
+    if (input.len <= 0) {
         PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
@@ -257,26 +263,32 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
         goto bail;
     }
 
-    prefs.frameInfo.contentSize = input_len;
+    prefs.frameInfo.contentSize = input.len;
     prefs.frameInfo.blockMode = block_mode_linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
     prefs.frameInfo.blockSizeID = block_id;
     prefs.frameInfo.contentChecksumFlag = checksum ? LZ4F_contentChecksumEnabled : LZ4F_noContentChecksum;
     prefs.compressionLevel = compression_level;
 
-    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressFrameBound(input_len, &prefs));
+    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressFrameBound(input.len, &prefs));
     BAIL_ON_NULL(output = PyBytes_FromStringAndSize(NULL, output_len));
     BAIL_ON_NULL(output_str = PyBytes_AsString(output));
 
-    if (input_len < NOGIL_COMPRESS_INPUT_SIZE_THRESHOLD) {
-        BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressFrame(output_str, output_len, input, input_len, &prefs));
+    if (input.len < NOGIL_COMPRESS_INPUT_SIZE_THRESHOLD) {
+        BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressFrame(output_str, output_len, input.buf, input.len, &prefs));
     } else {
-        BAIL_ON_LZ4_ERROR_NOGIL(output_len = LZ4F_compressFrame(output_str, output_len, input, input_len, &prefs));
+        BAIL_ON_LZ4_ERROR_NOGIL(output_len = LZ4F_compressFrame(output_str, output_len, input.buf, input.len, &prefs));
     }
     // output length might be shorter than estimated
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
+
+    PyBuffer_Release(&input);
+    input_held = 0;
     return output;
 
 bail:
+    if (input_held) {
+        PyBuffer_Release(&input);
+    }
     Py_XDECREF(output);
     return NULL;
 }
@@ -291,7 +303,7 @@ PyDoc_STRVAR(_lz4framed_decompress__doc__,
 "to decompress in chunks.\n"
 "\n"
 "Args:\n"
-"    b (bytes): The object containing lz4-framed data to decompress\n"
+"    b (bytes-like object): The object containing lz4-framed data to decompress\n"
 "    buffer_size (int): Initial size of buffer in bytes for decompressed\n"
 "                       result. This is useful if the frame is not expected\n"
 "                       to indicate uncompressed length of data. If\n"
@@ -308,17 +320,18 @@ PyDoc_STRVAR(_lz4framed_decompress__doc__,
 static PyObject*
 _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
 #if PY_MAJOR_VERSION >= 3
-    static const char *format = "y#|i:decompress";
+    static const char *format = "y*|i:decompress";
 #else
-    static const char *format = "s#|i:decompress";
+    static const char *format = "s*|i:decompress";
 #endif
     static char *keywords[] = {"b", "buffer_size", NULL};
 
     LZ4F_decompressionContext_t ctx = NULL;
     LZ4F_decompressOptions_t opt = {0, {0}};
     LZ4F_frameInfo_t frame_info;
+    Py_buffer input;
+    int input_held = 0;             // whether Py_buffer (input) needs to be released
     const char *input_pos;          // position in input
-    Py_ssize_t input_len;           // bytes remaining in input
     size_t input_remaining;         // bytes remaining in input
     size_t input_read;              // used by LZ4 functions to indicate how many bytes were / can be read
     size_t input_size_hint;         // LZ4 hint to how many bytes make up the remaining block + next header
@@ -330,10 +343,16 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
     size_t output_written;          // used by LZ4 to indicate how many bytes were / can be written
     UNUSED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &input_pos, &input_len, &buffer_size)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &input, &buffer_size)) {
         goto bail;
     }
-    if (input_len <= 0) {
+    input_held = 1;
+
+    if (!PyBuffer_IsContiguous(&input, 'C')) {
+        PyErr_SetString(PyExc_ValueError, "input not contiguous");
+        goto bail;
+    }
+    if (input.len <= 0) {
         PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
@@ -341,7 +360,8 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_Format(PyExc_ValueError, "buffer_size (%d) invalid", buffer_size);
         goto bail;
     }
-    input_read = input_remaining = input_len;
+    input_read = input_remaining = input.len;
+    input_pos = input.buf;
 
     BAIL_ON_LZ4_ERROR(LZ4F_createDecompressionContext(&ctx, LZ4F_VERSION));
 
@@ -401,11 +421,16 @@ _lz4framed_decompress(PyObject *self, PyObject *args, PyObject *kwargs) {
         }
     }
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
+    PyBuffer_Release(&input);
+    input_held = 0;
     LZ4F_freeDecompressionContext(ctx);
 
     return output;
 
 bail:
+    if (input_held) {
+        PyBuffer_Release(&input);
+    }
     Py_XDECREF(output);
     LZ4F_freeDecompressionContext(ctx);
     return NULL;
@@ -625,7 +650,7 @@ PyDoc_STRVAR(_lz4framed_compress_update__doc__,
 "\n"
 "Args:\n"
 "    ctx: Compression context\n"
-"    b (bytes): The object containing lz4-framed data to decompress\n"
+"    b (bytes-like object): The object containing lz4-framed data to decompress\n"
 "\n"
 "Raises:\n"
 "    LZ4FNoDataError: If provided data is of zero length. (Useful for ending compression loop.)\n"
@@ -635,28 +660,32 @@ PyDoc_STRVAR(_lz4framed_compress_update__doc__,
 static PyObject*
 _lz4framed_compress_update(PyObject *self, PyObject *args) {
 #if PY_MAJOR_VERSION >= 3
-    static const char *format = "Oy#:compress_update";
+    static const char *format = "Oy*:compress_update";
 #else
-    static const char *format = "Os#:compress_update";
+    static const char *format = "Os*:compress_update";
 #endif
     _lz4f_cctx_t *cctx = NULL;
     PyObject *ctx_capsule;
-    const char *input;
-    Py_ssize_t input_len;
+    Py_buffer input;
+    int input_held = 0; // whether Py_buffer (input) needs to be released
     PyObject *output = NULL;
     char *output_str;
     size_t output_len;
     LZ4FRAMED_LOCK_FLAG;
     UNUSED(self);
 
-    if (!PyArg_ParseTuple(args, format, &ctx_capsule, &input, &input_len)) {
+    if (!PyArg_ParseTuple(args, format, &ctx_capsule, &input)) {
         goto bail;
     }
     if (!PyCapsule_IsValid(ctx_capsule, COMPRESSION_CAPSULE_NAME)) {
         PyErr_SetString(PyExc_ValueError, "ctx invalid");
         goto bail;
     }
-    if (input_len <= 0) {
+    if (!PyBuffer_IsContiguous(&input, 'C')) {
+        PyErr_SetString(PyExc_ValueError, "input not contiguous");
+        goto bail;
+    }
+    if (input.len <= 0) {
         PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
@@ -665,22 +694,28 @@ _lz4framed_compress_update(PyObject *self, PyObject *args) {
 
     ENTER_LZ4FRAMED(cctx);
 
-    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBound(input_len, &(cctx->prefs)));
+    BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressBound(input.len, &(cctx->prefs)));
     BAIL_ON_NULL(output = PyBytes_FromStringAndSize(NULL, output_len));
     BAIL_ON_NULL(output_str = PyBytes_AsString(output));
 
-    if (input_len < NOGIL_COMPRESS_INPUT_SIZE_THRESHOLD) {
-        BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressUpdate(cctx->ctx, output_str, output_len, input, input_len, NULL));
+    if (input.len < NOGIL_COMPRESS_INPUT_SIZE_THRESHOLD) {
+        BAIL_ON_LZ4_ERROR(output_len = LZ4F_compressUpdate(cctx->ctx, output_str, output_len, input.buf, input.len,
+                                                           NULL));
     } else {
-        BAIL_ON_LZ4_ERROR_NOGIL(output_len = LZ4F_compressUpdate(cctx->ctx, output_str, output_len, input, input_len,
-                                                                 NULL));
+        BAIL_ON_LZ4_ERROR_NOGIL(output_len = LZ4F_compressUpdate(cctx->ctx, output_str, output_len, input.buf,
+                                                                 input.len, NULL));
     }
     EXIT_LZ4FRAMED(cctx);
     BAIL_ON_NONZERO(_PyBytes_Resize(&output, output_len));
+    PyBuffer_Release(&input);
+    input_held = 0;
     return output;
 
 bail:
     EXIT_LZ4FRAMED(cctx);
+    if (input_held) {
+        PyBuffer_Release(&input);
+    }
     Py_XDECREF(output);
     return NULL;
 }
@@ -824,7 +859,7 @@ PyDoc_STRVAR(_lz4framed_decompress_update__doc__,
 "function may return no chunks if they are incomplete.\n"
 "Args:\n"
 "    ctx: Decompression context\n"
-"    b (bytes): The object containing lz4-framed data to decompress\n"
+"    b (bytes-like object): The object containing lz4-framed data to decompress\n"
 "    chunk_len (int): Size of uncompressed chunks in bytes. If not all of the\n"
 "                     data fits in one chunk, multiple will be used. Ideally\n"
 "                     only one chunk is required per call of this method - this can\n"
@@ -837,16 +872,17 @@ PyDoc_STRVAR(_lz4framed_decompress_update__doc__,
 static PyObject*
 _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
 #if PY_MAJOR_VERSION >= 3
-    static const char *format = "Oy#|i:decompress_update";
+    static const char *format = "Oy*|i:decompress_update";
 #else
-    static const char *format = "Os#|i:decompress_update";
+    static const char *format = "Os*|i:decompress_update";
 #endif
     static char *keywords[] = {"ctx", "b", "chunk_len", NULL};
 
     _lz4f_dctx_t *dctx = NULL;
     PyObject *dctx_capsule;
+    Py_buffer input;
+    int input_held = 0;              // whether Py_buffer (input) needs to be released
     const char *input_pos;           // position in input
-    Py_ssize_t input_len;
     size_t input_remaining;          // bytes remaining in input
     size_t input_read;               // used by LZ4 functions to indicate how many bytes were / can be read
     size_t input_size_hint = 1;      // LZ4 hint to how many bytes make up the remaining block + next header
@@ -860,15 +896,18 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     LZ4FRAMED_LOCK_FLAG;
     UNUSED(self);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &dctx_capsule, &input_pos, &input_len,
-                                     &chunk_len)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &dctx_capsule, &input, &chunk_len)) {
         goto bail;
     }
     if (!PyCapsule_IsValid(dctx_capsule, DECOMPRESSION_CAPSULE_NAME)) {
         PyErr_SetString(PyExc_ValueError, "ctx invalid");
         goto bail;
     }
-    if (input_len <= 0) {
+    if (!PyBuffer_IsContiguous(&input, 'C')) {
+        PyErr_SetString(PyExc_ValueError, "input not contiguous");
+        goto bail;
+    }
+    if (input.len <= 0) {
         PyErr_SetNone(LZ4FNoDataError);
         goto bail;
     }
@@ -879,7 +918,8 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     // Guaranteed to succeed due to PyCapsule_IsValid check above
     dctx = PyCapsule_GetPointer(dctx_capsule, DECOMPRESSION_CAPSULE_NAME);
 
-    input_read = input_remaining = input_len;
+    input_read = input_remaining = input.len;
+    input_pos = input.buf;
 
     // output list
     BAIL_ON_NULL(list = PyList_New(0));
@@ -925,6 +965,8 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
     // append input size hint to list
     BAIL_ON_NULL(size_hint = PyLong_FromSize_t(input_size_hint));
     BAIL_ON_NONZERO(PyList_Append(list, size_hint));
+    PyBuffer_Release(&input);
+    input_held = 0;
     Py_CLEAR(chunk);
     Py_CLEAR(size_hint);
 
@@ -932,6 +974,9 @@ _lz4framed_decompress_update(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 bail:
     EXIT_LZ4FRAMED(dctx);
+    if (input_held) {
+        PyBuffer_Release(&input);
+    }
     Py_XDECREF(chunk);
     Py_XDECREF(size_hint);
     Py_XDECREF(list);

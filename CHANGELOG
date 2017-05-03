@@ -1,3 +1,6 @@
+UNRELEASED
+- Allow for any bytes-like objects as input (e.g. memoryview)
+
 0.9.6
 - Windows build compatibility
 

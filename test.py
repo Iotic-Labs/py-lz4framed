@@ -107,6 +107,9 @@ class TestCompress(TestHelperMixin, TestCase):
         self.check_compress_long(level=0)
         self.check_compress_long(level=10)
 
+    def test_compress_memoryview(self):
+        view = memoryview(LONG_INPUT)
+        self.assertEqual(view, decompress(compress(view)))
 
 class TestDecompress(TestHelperMixin, TestCase):
 
@@ -140,6 +143,9 @@ class TestDecompress(TestHelperMixin, TestCase):
             with self.assertRaisesRegex(ValueError, 'frame incomplete'):
                 decompress(output[:-20])
 
+    def test_decompress_memoryview(self):
+        view = memoryview(compress(LONG_INPUT))
+        self.assertEqual(LONG_INPUT, decompress(view))
 
 class TestLowLevelFunctions(TestHelperMixin, TestCase):
 
@@ -279,6 +285,8 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
         func(SHORT_INPUT, level=0)
         func(SHORT_INPUT, level=LZ4F_COMPRESSION_MAX)
 
+        func(memoryview(LONG_INPUT))
+
     def test_decompress_update_invalid(self):
         with self.assertRaises(TypeError):
             decompress_update()
@@ -313,6 +321,11 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
         ctx = create_decompression_context()
         with self.assertRaisesLz4FramedError(LZ4F_ERROR_contentChecksum_invalid):
             decompress_update(ctx, in_raw)
+
+    def test_decompress_update_memoryview(self):
+        ctx = create_decompression_context()
+        data = decompress_update(ctx, memoryview(compress(LONG_INPUT)))
+        self.assertEqual(b''.join(data[:-1]), LONG_INPUT)
 
 
 class TestCompressor(TestHelperMixin, TestCase):
@@ -415,3 +428,23 @@ class TestDecompressor(TestHelperMixin, TestCase):
         # some data should have been written
         out_bytes.seek(SEEK_END)
         self.assertTrue(out_bytes.tell() > 0)
+
+
+def pympler_run(iterations=20):
+    from unittest import main
+    from pympler import tracker
+    from gc import collect
+
+    tracker = tracker.SummaryTracker()
+    for i in range(iterations):
+        try:
+            main()
+        except SystemExit:
+            pass
+        if i % 2:
+            collect()
+            tracker.print_diff()
+
+
+if __name__ == '__main__':
+    pympler_run()
