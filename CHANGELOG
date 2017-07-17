@@ -1,4 +1,4 @@
-UNRELEASED
+0.9.7
 - Allow for any bytes-like objects as input (e.g. memoryview)
 
 0.9.6
