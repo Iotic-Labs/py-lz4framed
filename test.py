@@ -29,7 +29,7 @@ from lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOC
                        create_compression_context, compress_begin, compress_update, compress_end,
                        create_decompression_context, get_frame_info, decompress_update,
                        get_block_size,
-                       Compressor, Decompressor)
+                       Compressor, WritableCompressor, Decompressor)
 
 PY2 = version_info[0] < 3
 
@@ -398,6 +398,39 @@ class TestCompressor(TestHelperMixin, TestCase):
         self.__fp_test(level=0)
         # levels > 10 (v1.7.5) are significantly slower
         self.__fp_test(level=10)
+
+
+class TestWritableCompressor(TestHelperMixin, TestCase):
+    def test_writablecompressor_init(self):
+        with self.assertRaisesRegex(AttributeError, 'has no attribute \'write\''):
+            WritableCompressor('1')
+
+        # non-callable write attribute
+        class Empty(object):
+            write = 1
+        with self.assertRaises(TypeError):
+            WritableCompressor(Empty())
+
+        # cannot use context without fp
+        with self.assertRaises(ValueError):
+            with WritableCompressor() as _:  # noqa (unused variable)
+                pass
+
+    def __fp_test(self, in_raw=LONG_INPUT, **kwargs):
+        in_bytes = BytesIO(in_raw)
+        out_bytes = BytesIO()
+
+        with WritableCompressor(out_bytes, **kwargs) as wcompressor:
+            try:
+                while True:
+                    wcompressor.write(in_bytes.read(1024))
+            # raised by compressor.update() on empty data argument
+            except Lz4FramedNoDataError:
+                pass
+        self.assertEqual(decompress(out_bytes.getvalue()), in_raw)
+
+    def test_writablecompressor_fp(self):
+        self.__fp_test()
 
 
 class TestDecompressor(TestHelperMixin, TestCase):

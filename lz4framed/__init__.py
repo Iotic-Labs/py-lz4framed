@@ -139,6 +139,12 @@ class Compressor(object):
                 return compress_end(self.__ctx)
 
 
+class WritableCompressor(Compressor):
+    """Extends Compressor by a write method, so it can be used as a file-like object."""
+    def write(self, data):
+        return self.update(data)
+
+
 class Decompressor(__Iterable):
     """Iteratively decompress blocks of an lz4-frame from a file-like object, e.g.:
 
