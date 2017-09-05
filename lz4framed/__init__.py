@@ -29,22 +29,23 @@ classes instead or manually utilise the context-using low-level methods. All met
 
 from threading import Lock
 
-from _lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB,  # noqa (unused import)
-                        LZ4F_BLOCKSIZE_MAX1MB, LZ4F_BLOCKSIZE_MAX4MB,
-                        LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MIN_HC, LZ4F_COMPRESSION_MAX,
-                        LZ4F_ERROR_GENERIC, LZ4F_ERROR_maxBlockSize_invalid, LZ4F_ERROR_blockMode_invalid,
-                        LZ4F_ERROR_contentChecksumFlag_invalid, LZ4F_ERROR_compressionLevel_invalid,
-                        LZ4F_ERROR_headerVersion_wrong, LZ4F_ERROR_blockChecksum_unsupported,
-                        LZ4F_ERROR_reservedFlag_set, LZ4F_ERROR_allocation_failed, LZ4F_ERROR_srcSize_tooLarge,
-                        LZ4F_ERROR_dstMaxSize_tooSmall, LZ4F_ERROR_frameHeader_incomplete, LZ4F_ERROR_frameType_unknown,
-                        LZ4F_ERROR_frameSize_wrong, LZ4F_ERROR_srcPtr_wrong, LZ4F_ERROR_decompressionFailed,
-                        LZ4F_ERROR_headerChecksum_invalid, LZ4F_ERROR_contentChecksum_invalid,
-                        LZ4F_VERSION, LZ4_VERSION, __version__,
-                        Lz4FramedError, Lz4FramedNoDataError,
-                        compress, decompress,
-                        create_compression_context, compress_begin, compress_update, compress_end,
-                        create_decompression_context, get_frame_info, decompress_update,
-                        get_block_size)
+from _lz4framed import (  # noqa (unused import)
+    LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB, LZ4F_BLOCKSIZE_MAX1MB,
+    LZ4F_BLOCKSIZE_MAX4MB,
+    LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MIN_HC, LZ4F_COMPRESSION_MAX,
+    LZ4F_ERROR_GENERIC, LZ4F_ERROR_maxBlockSize_invalid, LZ4F_ERROR_blockMode_invalid,
+    LZ4F_ERROR_contentChecksumFlag_invalid, LZ4F_ERROR_compressionLevel_invalid, LZ4F_ERROR_headerVersion_wrong,
+    LZ4F_ERROR_blockChecksum_invalid, LZ4F_ERROR_reservedFlag_set, LZ4F_ERROR_allocation_failed,
+    LZ4F_ERROR_srcSize_tooLarge, LZ4F_ERROR_dstMaxSize_tooSmall, LZ4F_ERROR_frameHeader_incomplete,
+    LZ4F_ERROR_frameType_unknown, LZ4F_ERROR_frameSize_wrong, LZ4F_ERROR_srcPtr_wrong, LZ4F_ERROR_decompressionFailed,
+    LZ4F_ERROR_headerChecksum_invalid, LZ4F_ERROR_contentChecksum_invalid, LZ4F_ERROR_frameDecoding_alreadyStarted,
+    LZ4F_VERSION, LZ4_VERSION, __version__,
+    Lz4FramedError, Lz4FramedNoDataError,
+    compress, decompress,
+    create_compression_context, compress_begin, compress_update, compress_end,
+    create_decompression_context, get_frame_info, decompress_update,
+    get_block_size
+)
 
 from .compat import Iterable as __Iterable
 
@@ -74,7 +75,7 @@ class Compressor(object):
     """
 
     def __init__(self, fp=None, block_size_id=LZ4F_BLOCKSIZE_DEFAULT, block_mode_linked=True, checksum=False,
-                 autoflush=False, level=LZ4F_COMPRESSION_MIN):
+                 autoflush=False, level=LZ4F_COMPRESSION_MIN, block_checksum=False):
         """
         Args:
             fp: File like object (supporting write() method) to write compressed data to. If not set, data will be
@@ -86,6 +87,7 @@ class Compressor(object):
                               waiting for internal buffer to be filled. (This reduces internal buffer size.)
             level (int): Compression level. Values lower than 3 use fast compression. Recommended
                          range for hc compression is between 4 and 9, with a maximum of LZ4_COMPRESSION_MAX.
+            block_checksum (bool): Whether to produce checksum after each block
         """
         self.__ctx = create_compression_context()
         self.__lock = Lock()
@@ -96,7 +98,8 @@ class Compressor(object):
         else:
             self.__write = fp.write
         self.__header = compress_begin(self.__ctx, block_size_id=block_size_id, block_mode_linked=block_mode_linked,
-                                       checksum=checksum, autoflush=autoflush, level=level)
+                                       checksum=checksum, autoflush=autoflush, level=level,
+                                       block_checksum=block_checksum)
 
     def __enter__(self):
         if self.__write is None:
@@ -139,7 +142,7 @@ class Compressor(object):
                 return compress_end(self.__ctx)
 
 
-class Decompressor(__Iterable):
+class Decompressor(__Iterable):  # pylint: disable=super-init-not-called
     """Iteratively decompress blocks of an lz4-frame from a file-like object, e.g.:
 
         with open('myFile', 'rb') as f:

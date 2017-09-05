@@ -131,7 +131,7 @@ typedef struct {
 #endif
 } _lz4f_dctx_t;
 
-static LZ4F_preferences_t prefs_defaults = {{0, 0, 0, 0, 0, {0}}, 0, 0, {0}};
+static LZ4F_preferences_t prefs_defaults = {{0, 0, 0, 0, 0, 0, 0}, 0, 0, {0}};
 
 /******************************************************************************/
 
@@ -198,7 +198,7 @@ bail:
 
 PyDoc_STRVAR(_lz4framed_compress__doc__,
 "compress(b, block_size_id=LZ4F_BLOCKSIZE_DEFAULT, block_mode_linked=True,\n"
-"         checksum=False, level=0) -> bytes\n"
+"         checksum=False, level=0, block_checksum=False) -> bytes\n"
 "\n"
 "Compresses the data given in b, returning the compressed and lz4-framed\n"
 "result.\n"
@@ -213,6 +213,7 @@ PyDoc_STRVAR(_lz4framed_compress__doc__,
 "    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC use fast\n"
 "                 compression. Recommended range for hc compression is between 4 and 9,\n"
 "                 with a maximum of LZ4F_COMPRESSION_MAX.\n"
+"    block_checksum (bool): Whether to produce checksum after each block.\n"
 "\n"
 "Raises:\n"
 "    LZ4FNoDataError: If provided data is of zero length. (Useful for ending compression loop.)\n"
@@ -222,17 +223,18 @@ PyDoc_STRVAR(_lz4framed_compress__doc__,
 static PyObject*
 _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
 #if PY_MAJOR_VERSION >= 3
-    static const char *format = "y*|iiii:compress";
+    static const char *format = "y*|iiiii:compress";
 #else
-    static const char *format = "s*|iiii:compress";
+    static const char *format = "s*|iiiii:compress";
 #endif
-    static char *keywords[] = {"b", "block_size_id", "block_mode_linked", "checksum", "level", NULL};
+    static char *keywords[] = {"b", "block_size_id", "block_mode_linked", "checksum", "level", "block_checksum", NULL};
 
     LZ4F_preferences_t prefs = prefs_defaults;
     Py_buffer input;
     int input_held = 0; // whether Py_buffer (input) needs to be released
     int block_id = LZ4F_default;
     int block_mode_linked = 1;
+    int block_checksum = 0;
     int checksum = 0;
     int compression_level = LZ4_COMPRESSION_MIN;
     PyObject *output = NULL;
@@ -241,7 +243,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
     UNUSED(self);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &input, &block_id, &block_mode_linked, &checksum,
-                                     &compression_level)) {
+                                     &compression_level, &block_checksum)) {
         goto bail;
     }
     input_held = 1;
@@ -258,7 +260,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_Format(PyExc_ValueError, "block_size_id (%d) invalid", block_id);
         goto bail;
     }
-    if (compression_level < LZ4_COMPRESSION_MIN || compression_level > LZ4_COMPRESSION_MAX) {
+    if (compression_level > LZ4_COMPRESSION_MAX) {
         PyErr_Format(PyExc_ValueError, "level (%d) invalid", compression_level);
         goto bail;
     }
@@ -266,6 +268,7 @@ _lz4framed_compress(PyObject *self, PyObject *args, PyObject *kwargs) {
     prefs.frameInfo.contentSize = input.len;
     prefs.frameInfo.blockMode = block_mode_linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
     prefs.frameInfo.blockSizeID = block_id;
+    prefs.frameInfo.blockChecksumFlag = block_checksum ? LZ4F_blockChecksumEnabled : LZ4F_noBlockChecksum;
     prefs.frameInfo.contentChecksumFlag = checksum ? LZ4F_contentChecksumEnabled : LZ4F_noContentChecksum;
     prefs.compressionLevel = compression_level;
 
@@ -555,7 +558,7 @@ bail:
 
 PyDoc_STRVAR(_lz4framed_compress_begin__doc__,
 "compress_begin(ctx, block_size_id=LZ4F_BLOCKSIZE_DEFAULT, block_mode_linked=True,\n"
-"               checksum=False, autoflush=False, level=0) -> bytes\n"
+"               checksum=False, autoflush=False, level=0, block_checksum=False) -> bytes\n"
 "\n"
 "Generates and returns frame header, sets compression options.\n"
 "\n"
@@ -571,6 +574,7 @@ PyDoc_STRVAR(_lz4framed_compress_begin__doc__,
 "    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC use fast\n"
 "                 compression. Recommended range for hc compression is between 4 and 9,\n"
 "                 with a maximum of LZ4F_COMPRESSION_MAX.\n"
+"    block_checksum (bool): Whether to produce checksum after each block.\n"
 "\n"
 "Raises:\n"
 "    Lz4FramedError: If a compression failure occured");
@@ -578,13 +582,15 @@ PyDoc_STRVAR(_lz4framed_compress_begin__doc__,
                                  METH_VARARGS | METH_KEYWORDS, _lz4framed_compress_begin__doc__}
 static PyObject*
 _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
-    static const char *format = "O|iiiii:compress_begin";
-    static char *keywords[] = {"ctx", "block_size_id", "block_mode_linked", "checksum", "autoflush", "level", NULL};
+    static const char *format = "O|iiiiii:compress_begin";
+    static char *keywords[] = {"ctx", "block_size_id", "block_mode_linked", "checksum", "autoflush", "level",
+                               "block_checksum", NULL};
 
     _lz4f_cctx_t *cctx = NULL;
     PyObject *ctx_capsule;
     int block_id = LZ4F_default;
     int block_mode_linked = 1;
+    int block_checksum = 0;
     int checksum = 0;
     int autoflush = 0;
     int compression_level = LZ4_COMPRESSION_MIN;
@@ -595,7 +601,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
     UNUSED(self);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, &ctx_capsule, &block_id, &block_mode_linked,
-                                     &checksum, &autoflush, &compression_level)) {
+                                     &checksum, &autoflush, &compression_level, &block_checksum)) {
         goto bail;
     }
     if (!PyCapsule_IsValid(ctx_capsule, COMPRESSION_CAPSULE_NAME)) {
@@ -606,7 +612,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_Format(PyExc_ValueError, "block_size_id (%d) invalid", block_id);
         goto bail;
     }
-    if (compression_level < LZ4_COMPRESSION_MIN || compression_level > LZ4_COMPRESSION_MAX) {
+    if (compression_level > LZ4_COMPRESSION_MAX) {
         PyErr_Format(PyExc_ValueError, "level (%d) invalid", compression_level);
         goto bail;
     }
@@ -618,6 +624,7 @@ _lz4framed_compress_begin(PyObject *self, PyObject *args, PyObject *kwargs) {
 
     cctx->prefs.frameInfo.blockMode = block_mode_linked ? LZ4F_blockLinked : LZ4F_blockIndependent;
     cctx->prefs.frameInfo.blockSizeID = block_id;
+    cctx->prefs.frameInfo.blockChecksumFlag = block_checksum ? LZ4F_blockChecksumEnabled : LZ4F_noBlockChecksum;
     cctx->prefs.frameInfo.contentChecksumFlag = checksum ? LZ4F_contentChecksumEnabled : LZ4F_noContentChecksum;
     cctx->prefs.compressionLevel = compression_level;
     cctx->prefs.autoFlush = autoflush ? 1 : 0;
@@ -1069,7 +1076,7 @@ init_lz4framed(void)
         PyModule_AddIntMacro(module, LZ4F_ERROR_contentChecksumFlag_invalid) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_compressionLevel_invalid) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_headerVersion_wrong) ||
-        PyModule_AddIntMacro(module, LZ4F_ERROR_blockChecksum_unsupported) ||
+        PyModule_AddIntMacro(module, LZ4F_ERROR_blockChecksum_invalid) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_reservedFlag_set) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_allocation_failed) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_srcSize_tooLarge) ||
@@ -1081,6 +1088,7 @@ init_lz4framed(void)
         PyModule_AddIntMacro(module, LZ4F_ERROR_decompressionFailed) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_headerChecksum_invalid) ||
         PyModule_AddIntMacro(module, LZ4F_ERROR_contentChecksum_invalid) ||
+        PyModule_AddIntMacro(module, LZ4F_ERROR_frameDecoding_alreadyStarted) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_DEFAULT", LZ4F_default) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX64KB", LZ4F_max64KB) ||
         PyModule_AddIntConstant(module, "LZ4F_BLOCKSIZE_MAX256KB", LZ4F_max256KB) ||

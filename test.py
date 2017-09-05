@@ -22,7 +22,7 @@ from io import BytesIO, SEEK_END
 
 from lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB, LZ4F_BLOCKSIZE_MAX1MB,
                        LZ4F_BLOCKSIZE_MAX4MB,
-                       LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MAX,
+                       LZ4F_COMPRESSION_MAX,
                        LZ4F_ERROR_GENERIC, LZ4F_ERROR_frameHeader_incomplete, LZ4F_ERROR_contentChecksum_invalid,
                        LZ4F_ERROR_frameType_unknown, Lz4FramedError, Lz4FramedNoDataError,
                        compress, decompress,
@@ -35,6 +35,7 @@ PY2 = version_info[0] < 3
 
 SHORT_INPUT = b'abcdefghijklmnopqrstuvwxyz0123456789'
 LONG_INPUT = SHORT_INPUT * (10**5)
+LEVEL_ACCELERATED_MAX = -10
 
 
 class TestHelperMixin(object):
@@ -96,12 +97,17 @@ class TestCompress(TestHelperMixin, TestCase):
                 # invalid checksum
                 decompress(compress(data, checksum=True)[:-1] + b'0')
 
+    def test_compress_block_checksum(self):
+        with self.assertRaises(TypeError):
+            compress(SHORT_INPUT, block_checksum=None)
+        self.check_compress_short(block_checksum=True)
+        self.check_compress_short(block_checksum=False)
+
     def test_compress_level(self):
         with self.assertRaises(TypeError):
             compress(SHORT_INPUT, level='1')
-        with self.assertRaises(ValueError):
-            compress(SHORT_INPUT, level=-1)
-        for level in range(LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MAX + 1):
+        # negative values designate accelerattion
+        for level in range(LEVEL_ACCELERATED_MAX, LZ4F_COMPRESSION_MAX + 1):
             self.check_compress_short(level=level)
         # large input, fast & hc levels (levels > 10 (v1.7.5) are significantly slower)
         self.check_compress_long(level=0)
@@ -220,9 +226,7 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
     def test_compress_begin_level(self):
         with self.assertRaises(TypeError):
             self.__compress_begin(level='1')
-        with self.assertRaises(ValueError):
-            self.__compress_begin(level=-1)
-        for level in range(LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MAX + 1):
+        for level in range(LEVEL_ACCELERATED_MAX, LZ4F_COMPRESSION_MAX + 1):
             self.__compress_begin(level=level)
 
     def test_compress_update_invalid(self):
@@ -282,10 +286,8 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
             for value in (False, True):
                 func(LONG_INPUT, **{arg: value})
 
-        for level in range(LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MAX + 1):
+        for level in range(LEVEL_ACCELERATED_MAX, LZ4F_COMPRESSION_MAX + 1):
             func(SHORT_INPUT, level=level)
-        func(SHORT_INPUT, level=0)
-        func(SHORT_INPUT, level=LZ4F_COMPRESSION_MAX)
 
         func(memoryview(LONG_INPUT))
 
@@ -393,7 +395,7 @@ class TestCompressor(TestHelperMixin, TestCase):
         self.__fp_test(autoflush=False)
 
     def test_compressor_level(self):
-        for level in range(LZ4F_COMPRESSION_MIN, LZ4F_COMPRESSION_MAX + 1):
+        for level in range(LEVEL_ACCELERATED_MAX, LZ4F_COMPRESSION_MAX + 1):
             self.__fp_test(in_raw=SHORT_INPUT, level=level)
         self.__fp_test(level=0)
         # levels > 10 (v1.7.5) are significantly slower
@@ -416,7 +418,7 @@ class TestDecompressor(TestHelperMixin, TestCase):
 
     def test_decompressor_fp(self):
         # levels > 10 (v1.7.5) are significantly slower
-        for level in (0, 10):
+        for level in (LEVEL_ACCELERATED_MAX, 10):
             out_bytes = BytesIO()
             for chunk in Decompressor(BytesIO(compress(LONG_INPUT, level=level))):
                 out_bytes.write(chunk)
