@@ -1,4 +1,4 @@
-UNRELEASED
+0.10.0
 - Updated lz4 to v1.8.0
 - Support for fast acceleration via negative compression levels
 - Support for block checksums
