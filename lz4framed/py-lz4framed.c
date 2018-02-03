@@ -31,6 +31,7 @@
 #define MAX(x, y) (x) >= (y) ? (x) : (y)
 #define KB *(1<<10)
 #define MB *(1<<20)
+// Due to negative levels now being supported, this no longer is particularly meaningful.
 #define LZ4_COMPRESSION_MIN 0
 #define LZ4_COMPRESSION_MIN_HC LZ4HC_CLEVEL_MIN
 #define LZ4_COMPRESSION_MAX LZ4HC_CLEVEL_MAX
@@ -210,9 +211,9 @@ PyDoc_STRVAR(_lz4framed_compress__doc__,
 "    block_mode_linked (bool): Whether compression blocks are linked. Better compression\n"
 "                              is achieved in linked mode.\n"
 "    checksum (bool): Whether to produce frame checksum\n"
-"    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC use fast\n"
-"                 compression. Recommended range for hc compression is between 4 and 9,\n"
-"                 with a maximum of LZ4F_COMPRESSION_MAX.\n"
+"    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC (including\n"
+"                 negative ones) use fast compression. Recommended range for hc compression\n"
+"                 is between 4 and 9, with a maximum of LZ4F_COMPRESSION_MAX.\n"
 "    block_checksum (bool): Whether to produce checksum after each block.\n"
 "\n"
 "Raises:\n"
@@ -571,9 +572,9 @@ PyDoc_STRVAR(_lz4framed_compress_begin__doc__,
 "    checksum (bool): Whether to produce frame checksum\n"
 "    autoflush (bool): Whether to flush output on update() calls rather than buffering\n"
 "                      incomplete blocks internally.\n"
-"    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC use fast\n"
-"                 compression. Recommended range for hc compression is between 4 and 9,\n"
-"                 with a maximum of LZ4F_COMPRESSION_MAX.\n"
+"    level (int): Compression level. Values lower than LZ4F_COMPRESSION_MIN_HC (including\n"
+"                 negative ones) use fast compression. Recommended range for hc compression\n"
+"                 is between 4 and 9, with a maximum of LZ4F_COMPRESSION_MAX.\n"
 "    block_checksum (bool): Whether to produce checksum after each block.\n"
 "\n"
 "Raises:\n"

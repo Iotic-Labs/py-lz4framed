@@ -85,8 +85,8 @@ class Compressor(object):
             checksum (bool): Whether to produce frame checksum
             autoflush (bool): Whether to return (or write to fp) compressed data on each update() call rather than
                               waiting for internal buffer to be filled. (This reduces internal buffer size.)
-            level (int): Compression level. Values lower than 3 use fast compression. Recommended
-                         range for hc compression is between 4 and 9, with a maximum of LZ4_COMPRESSION_MAX.
+            level (int): Compression level. Values lower than 3 (including negative ones) use fast compression.
+                         Recommended range for hc compression is between 4 and 9, with a maximum of LZ4_COMPRESSION_MAX.
             block_checksum (bool): Whether to produce checksum after each block
         """
         self.__ctx = create_compression_context()
