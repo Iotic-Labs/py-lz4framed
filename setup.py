@@ -34,7 +34,7 @@ else:
     READ_MD = lambda f: convert(f, 'rst')  # noqa: E731
 
 
-VERSION = '0.11.0'
+VERSION = '0.12.0'
 
 setup(
     name='py-lz4framed',
@@ -85,6 +85,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ]

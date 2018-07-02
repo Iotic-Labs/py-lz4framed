@@ -20,7 +20,8 @@
 #include <Python.h>
 #include <bytesobject.h>
 
-#include "lz4frame_static.h"
+#define LZ4F_STATIC_LINKING_ONLY
+#include "lz4frame.h"
 #include "lz4hc.h"
 
 /******************************************************************************/
@@ -132,7 +133,7 @@ typedef struct {
 #endif
 } _lz4f_dctx_t;
 
-static LZ4F_preferences_t prefs_defaults = {{0, 0, 0, 0, 0, 0, 0}, 0, 0, {0}};
+static LZ4F_preferences_t prefs_defaults = {{0, 0, 0, 0, 0, 0, 0}, 0, 0, 0, {0}};
 
 /******************************************************************************/
 
