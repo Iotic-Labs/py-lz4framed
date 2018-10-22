@@ -1,3 +1,6 @@
+0.13.0
+- Updated lz4 to v1.8.3 (data corruption fix for v1.8.2)
+
 0.12.0
 - Updated lz4 to v1.8.2
 - Confirmed compatibility with Python 3.7
