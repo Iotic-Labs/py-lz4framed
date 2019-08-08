@@ -19,7 +19,7 @@ persistent=no
 load-plugins=
 
 # Use multiple processes to speed up Pylint.
-jobs=2
+jobs=4
 
 # Allow loading of arbitrary C extensions. Extensions are imported into the
 # active Python interpreter and may run arbitrary code.
@@ -61,11 +61,7 @@ confidence=
 # --disable=W"
 #disable=execfile-builtin,import-star-module-level,no-absolute-import,unicode-builtin,xrange-builtin,raising-string,coerce-builtin,long-builtin,old-octal-literal,dict-iter-method,delslice-method,intern-builtin,oct-method,using-cmp-argument,next-method-called,range-builtin-not-iterating,standarderror-builtin,input-builtin,old-raise-syntax,zip-builtin-not-iterating,backtick,file-builtin,suppressed-message,buffer-builtin,print-statement,dict-view-method,hex-method,coerce-method,raw_input-builtin,old-ne-operator,useless-suppression,apply-builtin,cmp-builtin,setslice-method,parameter-unpacking,filter-builtin-not-iterating,reduce-builtin,old-division,reload-builtin,unichr-builtin,long-suffix,nonzero-method,unpacking-in-except,basestring-builtin,indexing-exception,map-builtin-not-iterating,round-builtin,metaclass-assignment,getslice-method,cmp-method
 # Custom exclude list:
-# R0903 - too-few-public-methods
-# W0511 - ignore fixme/todo for report
-# I0011 - locally-disabled pylint options
-# C0111 - missing-docstring
-disable=R0903,W0511,I0011,C0111
+disable=too-few-public-methods,W0511,locally-disabled,missing-docstring,useless-object-inheritance
 
 [REPORTS]
 
@@ -114,6 +110,9 @@ ignore-docstrings=yes
 
 # Ignore imports when computing similarities.
 ignore-imports=no
+
+# Activate the evaluation score.
+score=no
 
 
 [FORMAT]

@@ -120,11 +120,12 @@ class Compressor(object):
                 self.__header = None
                 self.__write(output)
                 self.update = self.__updateNextWrite
-            else:
-                header = self.__header
-                self.__header = None
-                self.update = self.__updateNextReturn
-                return header + output
+                return None
+
+            header = self.__header
+            self.__header = None
+            self.update = self.__updateNextReturn
+            return header + output
 
     # post-first update methods so do not require header write & fp checks
     def __updateNextWrite(self, b):  # pylint: disable=invalid-name
@@ -138,8 +139,9 @@ class Compressor(object):
         with self.__lock:
             if self.__write:
                 self.__write(compress_end(self.__ctx))
-            else:
-                return compress_end(self.__ctx)
+                return None
+
+            return compress_end(self.__ctx)
 
 
 class Decompressor(__Iterable):  # pylint: disable=super-init-not-called
@@ -162,6 +164,7 @@ class Decompressor(__Iterable):  # pylint: disable=super-init-not-called
         Args:
             fp: File like object (supporting read() method) to read compressed data from.
         """
+        super(Decompressor, self).__init__()
         if fp is None:
             raise TypeError('fp')
         elif not callable(fp.read):
