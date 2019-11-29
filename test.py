@@ -23,8 +23,8 @@ from io import BytesIO, SEEK_END
 from lz4framed import (LZ4F_BLOCKSIZE_DEFAULT, LZ4F_BLOCKSIZE_MAX64KB, LZ4F_BLOCKSIZE_MAX256KB, LZ4F_BLOCKSIZE_MAX1MB,
                        LZ4F_BLOCKSIZE_MAX4MB,
                        LZ4F_COMPRESSION_MAX,
-                       LZ4F_ERROR_GENERIC, LZ4F_ERROR_frameHeader_incomplete, LZ4F_ERROR_contentChecksum_invalid,
-                       LZ4F_ERROR_frameType_unknown, Lz4FramedError, Lz4FramedNoDataError,
+                       LZ4F_ERROR_GENERIC, LZ4F_ERROR_contentChecksum_invalid, LZ4F_ERROR_frameType_unknown,
+                       LZ4F_ERROR_srcPtr_wrong, Lz4FramedError, Lz4FramedNoDataError,
                        compress, decompress,
                        create_compression_context, compress_begin, compress_update, compress_end,
                        create_decompression_context, get_frame_info, decompress_update,
@@ -177,7 +177,7 @@ class TestLowLevelFunctions(TestHelperMixin, TestCase):
             get_frame_info(create_compression_context())
 
         ctx = create_decompression_context()
-        with self.assertRaisesLz4FramedError(LZ4F_ERROR_frameHeader_incomplete):
+        with self.assertRaisesLz4FramedError(LZ4F_ERROR_srcPtr_wrong):
             get_frame_info(ctx)
         # compress with non-default arguments, check info structure
         args = {'checksum': True,

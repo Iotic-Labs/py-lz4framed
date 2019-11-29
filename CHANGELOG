@@ -1,3 +1,6 @@
+0.14.0
+- Updated lz4 to v1.9.2 (includes fix for CVE-2019-17543)
+
 0.13.0
 - Updated lz4 to v1.8.3 (data corruption fix for v1.8.2)
 
