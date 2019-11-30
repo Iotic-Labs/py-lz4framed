@@ -16,6 +16,8 @@
 
 from __future__ import print_function
 
+import os
+
 # Allow for environments without setuptools
 try:
     from setuptools import setup, Extension
@@ -24,14 +26,11 @@ except ImportError:
     use_setuptools()
     from setuptools import setup, Extension
 
-# For converting markdown README.md
-try:
-    from pypandoc import convert
-except ImportError:
-    READ_MD = lambda f: open(f, 'r').read()  # noqa: E731
-    print('Warning: pypandoc module not found, will not convert Markdown to RST')
-else:
-    READ_MD = lambda f: convert(f, 'rst')  # noqa: E731
+
+def load_description(filename):
+    script_dir = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(script_dir, filename), 'r') as infile:
+        return infile.read()
 
 
 VERSION = '0.14.0'
@@ -40,7 +39,8 @@ setup(
     name='py-lz4framed',
     version=VERSION,
     description='LZ4Frame library for Python (via C bindings)',
-    long_description=READ_MD('README.md'),
+    long_description=load_description('README.md'),
+    long_description_content_type='text/markdown',
     author='Iotic Labs Ltd',
     author_email='info@iotic-labs.com',
     maintainer='Iotic Labs Ltd',
